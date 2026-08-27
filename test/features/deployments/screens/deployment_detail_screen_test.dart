@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:prasa_assist/core/theme/app_theme.dart';
 import 'package:prasa_assist/features/deployments/controllers/deployment_controller.dart';
 import 'package:prasa_assist/features/deployments/models/deployment_status.dart';
 import 'package:prasa_assist/features/deployments/models/service_deployment.dart';
@@ -48,10 +49,7 @@ void main() {
       find.text('No deployment with ID DEP-MISSING could be found.'),
       findsOneWidget,
     );
-    expect(
-      find.byKey(const ValueKey('retry-deployment-detail-button')),
-      findsOneWidget,
-    );
+    expect(find.text('Retry'), findsOneWidget);
   });
 
   testWidgets('shows a controller error when loading fails', (tester) async {
@@ -67,9 +65,7 @@ void main() {
     await _pumpDetail(tester, repository: repository);
     expect(find.text('Unable to load deployment'), findsOneWidget);
 
-    await tester.tap(
-      find.byKey(const ValueKey('retry-deployment-detail-button')),
-    );
+    await tester.tap(find.text('Retry'));
     await tester.pump();
     await tester.pump();
 
@@ -703,6 +699,7 @@ Future<DeploymentController> _pumpDetail(
 
   await tester.pumpWidget(
     MaterialApp(
+      theme: AppTheme.light,
       home: DeploymentDetailScreen(
         controller: actualController,
         deploymentId: deploymentId,

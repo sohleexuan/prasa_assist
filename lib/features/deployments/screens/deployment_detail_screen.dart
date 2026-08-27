@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_radius.dart';
+import '../../../core/theme/app_spacing.dart';
+import '../../../shared/widgets/app_empty_state.dart';
+import '../../../shared/widgets/app_error_state.dart';
+import '../../../shared/widgets/app_loading_indicator.dart';
+import '../../../shared/widgets/app_section_card.dart';
 import '../controllers/deployment_controller.dart';
 import '../models/deployment_status.dart';
 import '../models/service_deployment.dart';
@@ -67,11 +74,8 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7FB),
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        backgroundColor: const Color(0xFF17203A),
-        foregroundColor: Colors.white,
         leading: widget.onBack == null
             ? null
             : IconButton(
@@ -80,10 +84,7 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
                 tooltip: 'Back',
                 icon: const Icon(Icons.arrow_back),
               ),
-        title: const Text(
-          'Deployment Details',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
+        title: const Text('Deployment Details'),
       ),
       body: SafeArea(child: _buildBody()),
     );
@@ -91,51 +92,66 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return Center(
-        child: Semantics(
-          label: 'Loading deployment details',
-          child: const CircularProgressIndicator(),
-        ),
-      );
+      return const AppLoadingIndicator(message: 'Loading deployment details');
     }
     if (_loadError != null) {
-      return _LoadErrorState(message: _loadError!, onRetry: _loadDeployment);
+      return AppErrorState(
+        title: 'Unable to load deployment',
+        message: _loadError!,
+        actionLabel: 'Retry',
+        onAction: _loadDeployment,
+      );
     }
     if (_isNotFound) {
-      return _NotFoundState(
-        deploymentId: widget.deploymentId,
-        onRetry: _loadDeployment,
+      return AppEmptyState(
+        title: 'Deployment not found',
+        message: 'No deployment with ID ${widget.deploymentId} could be found.',
+        icon: Icons.search_off_outlined,
+        actionLabel: 'Retry',
+        onAction: _loadDeployment,
       );
     }
     if (_isDeleted) {
-      return const _DeletedState();
+      return const AppEmptyState(
+        title: 'Deployment deleted',
+        message: 'The prototype deployment record has been removed.',
+        icon: Icons.delete_outline,
+      );
     }
 
     final deployment = _deployment;
     if (deployment == null) {
-      return _NotFoundState(
-        deploymentId: widget.deploymentId,
-        onRetry: _loadDeployment,
+      return AppEmptyState(
+        title: 'Deployment not found',
+        message: 'No deployment with ID ${widget.deploymentId} could be found.',
+        icon: Icons.search_off_outlined,
+        actionLabel: 'Retry',
+        onAction: _loadDeployment,
       );
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.md,
+        AppSpacing.md,
+        AppSpacing.xl,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const _PrototypeNotice(),
           if (_isSubmitting) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             const LinearProgressIndicator(
               key: ValueKey('deployment-operation-progress'),
             ),
           ],
           if (_operationError != null) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             _OperationError(message: _operationError!),
           ],
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           _DetailSection(
             title: 'Status and workflow',
             icon: Icons.account_tree_outlined,
@@ -151,19 +167,19 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
                       deployment.deploymentId,
                       key: const ValueKey('detail-deployment-id'),
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: const Color(0xFF17203A),
-                        fontWeight: FontWeight.w800,
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     DeploymentStatusChip(status: deployment.status),
                   ],
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: AppSpacing.md),
                 DeploymentWorkflowIndicator(currentStatus: deployment.status),
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           _DetailSection(
             title: 'Route and vehicles',
             icon: Icons.route_outlined,
@@ -178,13 +194,13 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
                       '${deployment.vehicleCount} '
                       '${deployment.vehicleCount == 1 ? 'vehicle' : 'vehicles'}',
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.xxs),
                 for (final vehicleId in deployment.vehicleIds)
                   _VehicleItem(vehicleId: vehicleId),
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           _DetailSection(
             title: 'Service window',
             icon: Icons.schedule_outlined,
@@ -201,7 +217,7 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           _DetailSection(
             title: 'Operational purpose',
             icon: Icons.description_outlined,
@@ -212,7 +228,7 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
           ),
           if (deployment.incidentId != null ||
               deployment.sourceRecommendationId != null) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             _DetailSection(
               key: const ValueKey('linked-records-section'),
               title: 'Linked records',
@@ -231,7 +247,7 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
               ),
             ),
           ],
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           _DetailSection(
             title: 'Audit information',
             icon: Icons.history_outlined,
@@ -249,7 +265,7 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           _buildActions(deployment),
         ],
       ),
@@ -261,7 +277,7 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
 
     void addAction(Widget action) {
       if (actions.isNotEmpty) {
-        actions.add(const SizedBox(height: 10));
+        actions.add(const SizedBox(height: AppSpacing.sm));
       }
       actions.add(action);
     }
@@ -276,9 +292,6 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
               : () => widget.onEditDeployment?.call(deployment),
           icon: const Icon(Icons.edit_outlined),
           label: const Text('Edit'),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-          ),
         ),
       );
     }
@@ -293,10 +306,6 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
                 : () => _confirmStatusChange(DeploymentStatus.scheduled),
             icon: const Icon(Icons.event_available_outlined),
             label: const Text('Schedule Deployment'),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
-              backgroundColor: const Color(0xFF6D4AFF),
-            ),
           ),
         );
         addAction(_cancelButton());
@@ -310,10 +319,6 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
                 : () => _confirmStatusChange(DeploymentStatus.active),
             icon: const Icon(Icons.play_arrow_rounded),
             label: const Text('Start Deployment'),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
-              backgroundColor: const Color(0xFF6D4AFF),
-            ),
           ),
         );
         addAction(_cancelButton());
@@ -326,10 +331,7 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
                 : () => _confirmStatusChange(DeploymentStatus.completed),
             icon: const Icon(Icons.task_alt_outlined),
             label: const Text('Complete Deployment'),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
-              backgroundColor: const Color(0xFF166534),
-            ),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.success),
           ),
         );
         addAction(_cancelButton());
@@ -341,8 +343,8 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
             message:
                 'Deployment workflow is complete. No further status '
                 'changes are available.',
-            color: Color(0xFF166534),
-            background: Color(0xFFDCFCE7),
+            color: AppColors.onSuccessContainer,
+            background: AppColors.successContainer,
           ),
         );
       case DeploymentStatus.cancelled:
@@ -353,8 +355,8 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
             message:
                 'This deployment is cancelled. Workflow progression '
                 'has stopped.',
-            color: Color(0xFF991B1B),
-            background: Color(0xFFFEE2E2),
+            color: AppColors.onErrorContainer,
+            background: AppColors.errorContainer,
           ),
         );
         addAction(_deleteButton());
@@ -379,8 +381,7 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
       icon: const Icon(Icons.cancel_outlined),
       label: const Text('Cancel Deployment'),
       style: OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(48),
-        foregroundColor: const Color(0xFF991B1B),
+        foregroundColor: Theme.of(context).colorScheme.error,
       ),
     );
   }
@@ -392,8 +393,7 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
       icon: const Icon(Icons.delete_outline),
       label: const Text('Delete Prototype Record'),
       style: TextButton.styleFrom(
-        minimumSize: const Size.fromHeight(48),
-        foregroundColor: const Color(0xFF991B1B),
+        foregroundColor: Theme.of(context).colorScheme.error,
       ),
     );
   }
@@ -451,7 +451,7 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
             onPressed: () => Navigator.of(context).pop(true),
             style: nextStatus == DeploymentStatus.cancelled
                 ? FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF991B1B),
+                    backgroundColor: Theme.of(context).colorScheme.error,
                   )
                 : null,
             child: Text(content.confirmLabel),
@@ -536,7 +536,7 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
             key: const ValueKey('confirm-delete-deployment'),
             onPressed: () => Navigator.of(context).pop(true),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF991B1B),
+              backgroundColor: Theme.of(context).colorScheme.error,
             ),
             child: const Text('Delete'),
           ),
@@ -653,39 +653,10 @@ class _DetailSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, size: 20, color: const Color(0xFF6D4AFF)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: const Color(0xFF17203A),
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            child,
-          ],
-        ),
-      ),
+    return AppSectionCard(
+      title: title,
+      leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
+      body: child,
     );
   }
 }
@@ -699,7 +670,7 @@ class _DetailItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -710,7 +681,7 @@ class _DetailItem extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: AppSpacing.xxs),
           Text(value),
         ],
       ),
@@ -725,17 +696,19 @@ class _VehicleItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
+          Icon(
             Icons.directions_bus_outlined,
             size: 18,
-            color: Color(0xFF6D4AFF),
+            color: colorScheme.primary,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.xs),
           Expanded(child: Text(vehicleId)),
         ],
       ),
@@ -753,21 +726,24 @@ class _PrototypeNotice extends StatelessWidget {
       label: 'Prototype data, not live operations',
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: const Color(0xFFF1EFFF),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFD8D0FF)),
+          color: AppColors.developmentContainer,
+          borderRadius: AppRadius.medium,
+          border: Border.all(color: AppColors.developmentBorder),
         ),
         child: const Padding(
-          padding: EdgeInsets.all(12),
+          padding: EdgeInsets.all(AppSpacing.sm),
           child: Row(
             children: [
-              Icon(Icons.science_outlined, size: 20, color: Color(0xFF5636C7)),
-              SizedBox(width: 10),
+              Icon(
+                Icons.science_outlined,
+                color: AppColors.onDevelopmentContainer,
+              ),
+              SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
                   'Prototype data — not live operations',
                   style: TextStyle(
-                    color: Color(0xFF402596),
+                    color: AppColors.onDevelopmentContainer,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -799,15 +775,15 @@ class _WorkflowMessage extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.medium,
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(AppSpacing.sm),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(icon, color: color),
-            const SizedBox(width: 10),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
                 message,
@@ -828,127 +804,32 @@ class _OperationError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Semantics(
       container: true,
       liveRegion: true,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: const Color(0xFFFEE2E2),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFFCA5A5)),
+          color: colorScheme.errorContainer,
+          borderRadius: AppRadius.medium,
         ),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(AppSpacing.sm),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.error_outline, color: Color(0xFF991B1B)),
-              const SizedBox(width: 10),
+              Icon(Icons.error_outline, color: colorScheme.onErrorContainer),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
                   message,
                   key: const ValueKey('deployment-operation-error'),
-                  style: const TextStyle(color: Color(0xFF7F1D1D)),
+                  style: TextStyle(color: colorScheme.onErrorContainer),
                 ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LoadErrorState extends StatelessWidget {
-  const _LoadErrorState({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return _CenteredState(
-      icon: Icons.error_outline,
-      title: 'Unable to load deployment',
-      message: message,
-      action: FilledButton.icon(
-        key: const ValueKey('retry-deployment-detail-button'),
-        onPressed: onRetry,
-        icon: const Icon(Icons.refresh),
-        label: const Text('Retry'),
-      ),
-    );
-  }
-}
-
-class _NotFoundState extends StatelessWidget {
-  const _NotFoundState({required this.deploymentId, required this.onRetry});
-
-  final String deploymentId;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return _CenteredState(
-      icon: Icons.search_off_outlined,
-      title: 'Deployment not found',
-      message: 'No deployment with ID $deploymentId could be found.',
-      action: OutlinedButton.icon(
-        key: const ValueKey('retry-deployment-detail-button'),
-        onPressed: onRetry,
-        icon: const Icon(Icons.refresh),
-        label: const Text('Retry'),
-      ),
-    );
-  }
-}
-
-class _DeletedState extends StatelessWidget {
-  const _DeletedState();
-
-  @override
-  Widget build(BuildContext context) {
-    return const _CenteredState(
-      icon: Icons.delete_outline,
-      title: 'Deployment deleted',
-      message: 'The prototype deployment record has been removed.',
-    );
-  }
-}
-
-class _CenteredState extends StatelessWidget {
-  const _CenteredState({
-    required this.icon,
-    required this.title,
-    required this.message,
-    this.action,
-  });
-
-  final IconData icon;
-  final String title;
-  final String message;
-  final Widget? action;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 48, color: const Color(0xFF6D4AFF)),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 6),
-            Text(message, textAlign: TextAlign.center),
-            if (action != null) ...[const SizedBox(height: 16), action!],
-          ],
         ),
       ),
     );

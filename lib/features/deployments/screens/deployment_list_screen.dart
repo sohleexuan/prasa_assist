@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_spacing.dart';
+import '../../../shared/widgets/app_empty_state.dart';
+import '../../../shared/widgets/app_error_state.dart';
+import '../../../shared/widgets/app_loading_indicator.dart';
+import '../../../shared/widgets/app_page_scaffold.dart';
 import '../controllers/deployment_controller.dart';
 import '../models/deployment_status.dart';
 import '../models/service_deployment.dart';
 import '../widgets/deployment_card.dart';
+import '../widgets/deployment_data_notice.dart';
 
 class DeploymentListScreen extends StatefulWidget {
   const DeploymentListScreen({
@@ -61,43 +67,30 @@ class _DeploymentListScreenState extends State<DeploymentListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF6F7FB),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF17203A),
-        foregroundColor: Colors.white,
-        title: const Text(
-          'Service Deployments',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-      ),
+    return AppPageScaffold(
+      title: 'Service Deployments',
       floatingActionButton: FloatingActionButton.extended(
         key: const ValueKey('new-deployment-button'),
         onPressed: widget.onCreateDeployment,
-        backgroundColor: const Color(0xFF6D4AFF),
-        foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text('New Deployment'),
       ),
-      body: SafeArea(child: _buildBody()),
+      body: _buildBody(),
     );
   }
 
   Widget _buildBody() {
     if (widget.controller.isLoading) {
-      return Center(
-        child: Semantics(
-          label: 'Loading service deployments',
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const AppLoadingIndicator(message: 'Loading service deployments');
     }
 
     final errorMessage = widget.controller.errorMessage;
     if (errorMessage != null) {
-      return _ErrorState(
+      return AppErrorState(
+        title: 'Unable to load deployments',
         message: errorMessage,
-        onRetry: widget.controller.loadDeployments,
+        actionLabel: 'Retry',
+        onAction: widget.controller.loadDeployments,
       );
     }
 
@@ -108,15 +101,21 @@ class _DeploymentListScreenState extends State<DeploymentListScreen> {
     final activeCount = deployments
         .where((deployment) => deployment.status == DeploymentStatus.active)
         .length;
+
     if (deployments.isEmpty) {
       return CustomScrollView(
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.xs,
+            ),
             sliver: SliverList.list(
               children: [
-                const _PrototypeNotice(),
-                const SizedBox(height: 16),
+                const DeploymentDataNotice(),
+                const SizedBox(height: AppSpacing.md),
                 _DeploymentSummary(
                   totalCount: deployments.length,
                   scheduledCount: scheduledCount,
@@ -125,104 +124,107 @@ class _DeploymentListScreenState extends State<DeploymentListScreen> {
               ],
             ),
           ),
-          const SliverFillRemaining(hasScrollBody: false, child: _EmptyState()),
+          const SliverFillRemaining(
+            hasScrollBody: false,
+            child: AppEmptyState(
+              title: 'No service deployments yet',
+              message:
+                  'Create a draft deployment when additional or replacement '
+                  'service is required.',
+              icon: Icons.route_outlined,
+            ),
+          ),
         ],
       );
     }
 
     final filteredDeployments = _filterAndSort(deployments);
 
-    return Column(
-      children: [
-        Expanded(
-          child: CustomScrollView(
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                sliver: SliverList.list(
-                  children: [
-                    const _PrototypeNotice(),
-                    const SizedBox(height: 16),
-                    _DeploymentSummary(
-                      totalCount: deployments.length,
-                      scheduledCount: scheduledCount,
-                      activeCount: activeCount,
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      key: const ValueKey('deployment-search-field'),
-                      controller: _searchController,
-                      onChanged: (_) => setState(() {}),
-                      textInputAction: TextInputAction.search,
-                      decoration: InputDecoration(
-                        hintText: 'Search deployments',
-                        prefixIcon: const Icon(Icons.search),
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFDDE1EB),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _StatusFilter(
-                      selectedStatus: _selectedStatus,
-                      onSelected: (status) {
-                        setState(() {
-                          _selectedStatus = status;
-                        });
-                      },
-                    ),
-                    if (_filtersAreActive) ...[
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          key: const ValueKey('clear-deployment-filters'),
-                          onPressed: _clearFilters,
-                          icon: const Icon(Icons.filter_alt_off_outlined),
-                          label: const Text('Clear filters'),
-                        ),
-                      ),
-                    ] else
-                      const SizedBox(height: 8),
-                  ],
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            AppSpacing.md,
+            AppSpacing.md,
+            AppSpacing.xs,
+          ),
+          sliver: SliverList.list(
+            children: [
+              const DeploymentDataNotice(),
+              const SizedBox(height: AppSpacing.md),
+              _DeploymentSummary(
+                totalCount: deployments.length,
+                scheduledCount: scheduledCount,
+                activeCount: activeCount,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                key: const ValueKey('deployment-search-field'),
+                controller: _searchController,
+                onChanged: (_) => setState(() {}),
+                textInputAction: TextInputAction.search,
+                decoration: const InputDecoration(
+                  hintText: 'Search deployments',
+                  prefixIcon: Icon(Icons.search),
                 ),
               ),
-              if (filteredDeployments.isEmpty)
-                const SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _NoFilterResultsState(),
+              const SizedBox(height: AppSpacing.sm),
+              _StatusFilter(
+                selectedStatus: _selectedStatus,
+                onSelected: (status) {
+                  setState(() {
+                    _selectedStatus = status;
+                  });
+                },
+              ),
+              if (_filtersAreActive)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    key: const ValueKey('clear-deployment-filters'),
+                    onPressed: _clearFilters,
+                    icon: const Icon(Icons.filter_alt_off_outlined),
+                    label: const Text('Clear filters'),
+                  ),
                 )
               else
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
-                  sliver: SliverList.separated(
-                    itemCount: filteredDeployments.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final deployment = filteredDeployments[index];
-                      return DeploymentCard(
-                        key: ValueKey(
-                          'deployment-card-${deployment.deploymentId}',
-                        ),
-                        deployment: deployment,
-                        onTap: widget.onOpenDeployment == null
-                            ? null
-                            : () => widget.onOpenDeployment!(deployment),
-                      );
-                    },
-                  ),
-                ),
+                const SizedBox(height: AppSpacing.xs),
             ],
           ),
         ),
+        if (filteredDeployments.isEmpty)
+          const SliverFillRemaining(
+            hasScrollBody: false,
+            child: AppEmptyState(
+              title: 'No deployments match your filters',
+              message: 'Adjust or clear the active search and status filters.',
+              icon: Icons.filter_alt_off_outlined,
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              0,
+              AppSpacing.md,
+              AppSpacing.xxl * 2,
+            ),
+            sliver: SliverList.separated(
+              itemCount: filteredDeployments.length,
+              separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
+              itemBuilder: (context, index) {
+                final deployment = filteredDeployments[index];
+                return DeploymentCard(
+                  key: ValueKey('deployment-card-${deployment.deploymentId}'),
+                  deployment: deployment,
+                  onTap: widget.onOpenDeployment == null
+                      ? null
+                      : () => widget.onOpenDeployment!(deployment),
+                );
+              },
+            ),
+          ),
       ],
     );
   }
@@ -269,43 +271,6 @@ class _DeploymentListScreenState extends State<DeploymentListScreen> {
   }
 }
 
-class _PrototypeNotice extends StatelessWidget {
-  const _PrototypeNotice();
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      container: true,
-      label: 'Prototype data, not live operations',
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1EFFF),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFD8D0FF)),
-        ),
-        child: const Padding(
-          padding: EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Icon(Icons.science_outlined, size: 20, color: Color(0xFF5636C7)),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Prototype data — not live operations',
-                  style: TextStyle(
-                    color: Color(0xFF402596),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _DeploymentSummary extends StatelessWidget {
   const _DeploymentSummary({
     required this.totalCount,
@@ -328,7 +293,7 @@ class _DeploymentSummary extends StatelessWidget {
             valueKey: const ValueKey('deployment-total-count'),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: AppSpacing.xs),
         Expanded(
           child: _SummaryItem(
             label: 'Scheduled',
@@ -336,7 +301,7 @@ class _DeploymentSummary extends StatelessWidget {
             valueKey: const ValueKey('deployment-scheduled-count'),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: AppSpacing.xs),
         Expanded(
           child: _SummaryItem(
             label: 'Active',
@@ -362,31 +327,31 @@ class _SummaryItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFDDE1EB)),
-      ),
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xs,
+          vertical: AppSpacing.sm,
+        ),
         child: Column(
           children: [
             Text(
               '$count',
               key: valueKey,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: const Color(0xFF17203A),
-                fontWeight: FontWeight.w800,
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: AppSpacing.xxs),
             FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
                 label,
                 style: Theme.of(context).textTheme.labelMedium
-                    ?.copyWith(color: const Color(0xFF5F667A)),
+                    ?.copyWith(color: colorScheme.onSurfaceVariant),
               ),
             ),
           ],
@@ -418,7 +383,7 @@ class _StatusFilter extends StatelessWidget {
               onSelected: (_) => onSelected(null),
             ),
             for (final status in DeploymentStatus.values) ...[
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.xs),
               ChoiceChip(
                 key: ValueKey('status-filter-${status.name}'),
                 label: Text(status.displayLabel),
@@ -426,96 +391,6 @@ class _StatusFilter extends StatelessWidget {
                 onSelected: (_) => onSelected(status),
               ),
             ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.route_outlined, size: 48, color: Color(0xFF6D4AFF)),
-            SizedBox(height: 12),
-            Text(
-              'No service deployments yet',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            SizedBox(height: 6),
-            Text(
-              'Create a draft deployment when additional or replacement '
-              'service is required.',
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NoFilterResultsState extends StatelessWidget {
-  const _NoFilterResultsState();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(24, 24, 24, 112),
-        child: Text(
-          'No deployments match your filters',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Color(0xFF5F667A),
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Color(0xFF991B1B)),
-            const SizedBox(height: 12),
-            const Text(
-              'Unable to load deployments',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 6),
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              key: const ValueKey('retry-deployments-button'),
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-            ),
           ],
         ),
       ),

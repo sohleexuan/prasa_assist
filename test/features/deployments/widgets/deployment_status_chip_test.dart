@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:prasa_assist/core/theme/app_theme.dart';
 import 'package:prasa_assist/features/deployments/models/deployment_status.dart';
 import 'package:prasa_assist/features/deployments/widgets/deployment_status_chip.dart';
 
@@ -12,6 +13,7 @@ void main() {
     for (final status in DeploymentStatus.values) {
       await tester.pumpWidget(
         MaterialApp(
+          theme: AppTheme.light,
           home: Scaffold(body: DeploymentStatusChip(status: status)),
         ),
       );

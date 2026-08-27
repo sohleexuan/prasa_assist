@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_radius.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../models/service_deployment.dart';
 import 'deployment_status_chip.dart';
 
@@ -20,18 +22,12 @@ class DeploymentCard extends StatelessWidget {
           ? 'Deployment ${deployment.deploymentId}'
           : 'Open deployment ${deployment.deploymentId}',
       child: Card(
-        margin: EdgeInsets.zero,
-        elevation: 0,
-        color: colorScheme.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: colorScheme.outlineVariant),
-        ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
+          borderRadius: AppRadius.card,
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpacing.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -46,11 +42,11 @@ class DeploymentCard extends StatelessWidget {
                             deployment.deploymentId,
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(
-                                  color: const Color(0xFF17203A),
-                                  fontWeight: FontWeight.w800,
+                                  color: colorScheme.onSurface,
+                                  fontWeight: FontWeight.w700,
                                 ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: AppSpacing.xxs),
                           Text(
                             deployment.routeName,
                             style: Theme.of(context).textTheme.bodyLarge
@@ -64,17 +60,17 @@ class DeploymentCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.sm),
                     DeploymentStatusChip(status: deployment.status),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
                 _DetailRow(
                   icon: Icons.directions_bus_outlined,
                   label: _vehicleCountLabel(deployment.vehicleCount),
                   value: deployment.vehicleIds.join(', '),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
                 _DetailRow(
                   icon: Icons.schedule_outlined,
                   label: 'Service window',
@@ -82,7 +78,7 @@ class DeploymentCard extends StatelessWidget {
                       '${_formatDateTime(deployment.startTime)} to '
                       '${_formatDateTime(deployment.endTime)}',
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
                 _DetailRow(
                   icon: Icons.assignment_outlined,
                   label: 'Purpose',
@@ -90,12 +86,12 @@ class DeploymentCard extends StatelessWidget {
                 ),
                 if (deployment.incidentId != null ||
                     deployment.sourceRecommendationId != null) ...[
-                  const SizedBox(height: 14),
-                  Divider(height: 1, color: colorScheme.outlineVariant),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.md),
+                  const Divider(height: 1),
+                  const SizedBox(height: AppSpacing.sm),
                   Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                    spacing: AppSpacing.xs,
+                    runSpacing: AppSpacing.xs,
                     children: [
                       if (deployment.incidentId case final incidentId?)
                         _ReferenceLabel(
@@ -150,8 +146,8 @@ class _DetailRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20, color: const Color(0xFF6D4AFF)),
-        const SizedBox(width: 10),
+        Icon(icon, size: 20, color: colorScheme.primary),
+        const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -163,7 +159,7 @@ class _DetailRow extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: AppSpacing.xxs),
               Text(value, style: Theme.of(context).textTheme.bodyMedium),
             ],
           ),
@@ -181,23 +177,28 @@ class _ReferenceLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFFF1EFFF),
-        borderRadius: BorderRadius.circular(8),
+        color: colorScheme.primaryContainer,
+        borderRadius: AppRadius.small,
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: const Color(0xFF5636C7)),
-            const SizedBox(width: 6),
+            Icon(icon, size: AppSpacing.md, color: colorScheme.primary),
+            const SizedBox(width: AppSpacing.xs),
             Flexible(
               child: Text(
                 text,
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: const Color(0xFF402596),
+                  color: colorScheme.onPrimaryContainer,
                   fontWeight: FontWeight.w600,
                 ),
               ),

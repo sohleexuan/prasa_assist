@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:prasa_assist/core/theme/app_theme.dart';
 import 'package:prasa_assist/features/deployments/controllers/deployment_controller.dart';
 import 'package:prasa_assist/features/deployments/models/deployment_status.dart';
 import 'package:prasa_assist/features/deployments/models/service_deployment.dart';
@@ -37,7 +38,7 @@ void main() {
 
     expect(repository.getAllCallCount, 1);
     expect(find.text('Service Deployments'), findsOneWidget);
-    expect(find.text('Prototype data — not live operations'), findsOneWidget);
+    expect(find.text('Module 3 Prototype'), findsOneWidget);
     expect(find.text('DEP-120'), findsOneWidget);
   });
 
@@ -150,7 +151,11 @@ void main() {
     await _pumpScreen(tester, deployments: _filterDeployments());
 
     await _search(tester, 'not-a-real-deployment');
-    await tester.tap(find.byKey(const ValueKey('status-filter-cancelled')));
+    final cancelledFilter = find.byKey(
+      const ValueKey('status-filter-cancelled'),
+    );
+    await tester.ensureVisible(cancelledFilter);
+    await tester.tap(cancelledFilter);
     await tester.pump();
     expect(find.text('No deployments match your filters'), findsOneWidget);
 
@@ -191,7 +196,7 @@ void main() {
     await _pumpScreen(tester, repository: repository);
     expect(find.text('Unable to load deployments'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('retry-deployments-button')));
+    await tester.tap(find.text('Retry'));
     await tester.pump();
     await tester.pump();
 
@@ -225,6 +230,12 @@ void main() {
       onOpenDeployment: (deployment) => openedDeployment = deployment,
     );
 
+    await tester.scrollUntilVisible(
+      _card('DEP-120'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pump();
     await tester.tap(_card('DEP-120'));
     await tester.pump();
 
@@ -294,7 +305,7 @@ Future<DeploymentController> _pumpScreen(
 
   await tester.pumpWidget(
     MaterialApp(
-      theme: ThemeData(useMaterial3: true),
+      theme: AppTheme.light,
       home: DeploymentListScreen(
         controller: effectiveController,
         onCreateDeployment: onCreateDeployment,

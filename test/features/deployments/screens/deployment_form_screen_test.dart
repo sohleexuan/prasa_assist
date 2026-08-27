@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:prasa_assist/core/theme/app_theme.dart';
 import 'package:prasa_assist/features/deployments/controllers/deployment_controller.dart';
 import 'package:prasa_assist/features/deployments/models/deployment_prefill.dart';
 import 'package:prasa_assist/features/deployments/models/deployment_status.dart';
@@ -536,7 +537,7 @@ Future<_FormHarness> _pumpForm(
 
   await tester.pumpWidget(
     MaterialApp(
-      theme: ThemeData(useMaterial3: true),
+      theme: AppTheme.light,
       home: DeploymentFormScreen(
         key: UniqueKey(),
         controller: effectiveController,

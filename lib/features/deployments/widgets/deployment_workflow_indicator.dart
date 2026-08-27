@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_radius.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../models/deployment_status.dart';
 
 class DeploymentWorkflowIndicator extends StatelessWidget {
@@ -38,9 +41,9 @@ class DeploymentWorkflowIndicator extends StatelessWidget {
               ),
               showConnector: index < _mainStages.length - 1,
             ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.sm),
           _CancelledOutcome(isCurrent: isCancelled),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             'Workflow position only — no historical transition timestamps '
             'are recorded here.',
@@ -88,16 +91,17 @@ class _WorkflowStage extends StatelessWidget {
   Widget build(BuildContext context) {
     final isCurrent = appearance == _StageAppearance.current;
     final isCompleted = appearance == _StageAppearance.completed;
+    final colorScheme = Theme.of(context).colorScheme;
     final foreground = isCurrent
-        ? const Color(0xFF5636C7)
+        ? colorScheme.primary
         : isCompleted
-        ? const Color(0xFF166534)
-        : const Color(0xFF64748B);
+        ? AppColors.success
+        : colorScheme.onSurfaceVariant;
     final background = isCurrent
-        ? const Color(0xFFEDE9FE)
+        ? colorScheme.primaryContainer
         : isCompleted
-        ? const Color(0xFFDCFCE7)
-        : const Color(0xFFF1F5F9);
+        ? AppColors.successContainer
+        : colorScheme.surfaceContainer;
     final stateLabel = switch (appearance) {
       _StageAppearance.completed => 'completed workflow stage',
       _StageAppearance.current => 'current workflow stage',
@@ -140,16 +144,19 @@ class _WorkflowStage extends StatelessWidget {
                     width: 2,
                     height: 22,
                     color: isCompleted
-                        ? const Color(0xFF86EFAC)
-                        : const Color(0xFFCBD5E1),
+                        ? AppColors.success
+                        : colorScheme.outlineVariant,
                   ),
               ],
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.only(top: 4, bottom: 18),
+              padding: const EdgeInsets.only(
+                top: AppSpacing.xxs,
+                bottom: AppSpacing.md,
+              ),
               child: Text(
                 status.displayLabel,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -174,12 +181,13 @@ class _CancelledOutcome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final foreground = isCurrent
-        ? const Color(0xFF991B1B)
-        : const Color(0xFF64748B);
+        ? colorScheme.error
+        : colorScheme.onSurfaceVariant;
     final background = isCurrent
-        ? const Color(0xFFFEE2E2)
-        : const Color(0xFFF8FAFC);
+        ? colorScheme.errorContainer
+        : colorScheme.surfaceContainerLow;
 
     return Semantics(
       container: true,
@@ -189,19 +197,17 @@ class _CancelledOutcome extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: background,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: AppRadius.medium,
           border: Border.all(
-            color: isCurrent
-                ? const Color(0xFFFCA5A5)
-                : const Color(0xFFCBD5E1),
+            color: isCurrent ? colorScheme.error : colorScheme.outlineVariant,
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(AppSpacing.sm),
           child: Row(
             children: [
               Icon(Icons.cancel_outlined, color: foreground),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
                   isCurrent

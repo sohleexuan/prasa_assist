@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:prasa_assist/core/theme/app_theme.dart';
 import 'package:prasa_assist/features/deployments/models/deployment_status.dart';
 import 'package:prasa_assist/features/deployments/models/service_deployment.dart';
 import 'package:prasa_assist/features/deployments/widgets/deployment_card.dart';
@@ -92,7 +93,7 @@ Future<void> _pumpCard(
 }) {
   return tester.pumpWidget(
     MaterialApp(
-      theme: ThemeData(useMaterial3: true),
+      theme: AppTheme.light,
       home: Scaffold(
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(8),

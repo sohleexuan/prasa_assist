@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_radius.dart';
+import '../../../core/theme/app_spacing.dart';
+import '../../../shared/widgets/app_page_scaffold.dart';
+import '../../../shared/widgets/app_section_card.dart';
 import '../controllers/deployment_controller.dart';
 import '../models/deployment_prefill.dart';
 import '../models/deployment_status.dart';
@@ -119,243 +124,237 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF6F7FB),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF17203A),
-        foregroundColor: Colors.white,
-        title: Text(
-          _isEditMode ? 'Edit Deployment' : 'New Deployment',
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-      ),
+    return AppPageScaffold(
+      title: _isEditMode ? 'Edit Deployment' : 'New Deployment',
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
-        child: SafeArea(
-          child: Form(
-            key: _formKey,
-            autovalidateMode: _showValidation
-                ? AutovalidateMode.onUserInteraction
-                : AutovalidateMode.disabled,
-            child: SingleChildScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const _PrototypeNotice(),
-                  if (_isReadOnly) ...[
-                    const SizedBox(height: 12),
-                    _ReadOnlyNotice(status: widget.existingDeployment!.status),
-                  ],
-                  if (_isSubmitting) ...[
-                    const SizedBox(height: 12),
-                    const LinearProgressIndicator(
-                      key: ValueKey('deployment-form-progress'),
-                    ),
-                  ],
-                  if (_submissionError != null) ...[
-                    const SizedBox(height: 12),
-                    _SubmissionError(message: _submissionError!),
-                  ],
-                  const SizedBox(height: 16),
-                  _FormSection(
-                    title: 'Deployment',
-                    icon: Icons.assignment_outlined,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        TextFormField(
-                          key: const ValueKey('deployment-id-field'),
-                          controller: _deploymentIdController,
-                          readOnly: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Deployment ID',
-                            helperText: 'Generated automatically and read-only',
-                            prefixIcon: Icon(Icons.tag),
-                          ),
-                          validator: _requiredDeploymentId,
-                        ),
-                        if (_isEditMode) ...[
-                          const SizedBox(height: 12),
-                          Wrap(
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 10,
-                            runSpacing: 8,
-                            children: [
-                              const Text('Current status'),
-                              DeploymentStatusChip(
-                                status: widget.existingDeployment!.status,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _FormSection(
-                    title: 'Route and vehicles',
-                    icon: Icons.route_outlined,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        TextFormField(
-                          key: const ValueKey('route-id-field'),
-                          controller: _routeIdController,
-                          readOnly: _isReadOnly,
-                          textInputAction: TextInputAction.next,
-                          decoration: const InputDecoration(
-                            labelText: 'Route ID',
-                            helperText: 'Prototype entry — not connected to GTFS route data',
-                            prefixIcon: Icon(Icons.signpost_outlined),
-                          ),
-                          validator: (value) =>
-                              _requiredText(value, 'Route ID is required.'),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          key: const ValueKey('route-name-field'),
-                          controller: _routeNameController,
-                          readOnly: _isReadOnly,
-                          textInputAction: TextInputAction.next,
-                          decoration: const InputDecoration(
-                            labelText: 'Route name',
-                            prefixIcon: Icon(Icons.alt_route_outlined),
-                          ),
-                          validator: (value) =>
-                              _requiredText(value, 'Route name is required.'),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          key: const ValueKey('vehicle-ids-field'),
-                          controller: _vehicleIdsController,
-                          readOnly: _isReadOnly,
-                          keyboardType: TextInputType.text,
-                          textInputAction: TextInputAction.next,
-                          onChanged: (_) => setState(() {}),
-                          decoration: const InputDecoration(
-                            labelText: 'Vehicle IDs',
-                            hintText: 'ABC 1230, DEF 4567',
-                            helperText:
-                                'Enter actual vehicle IDs separated by commas. '
-                                'Availability is not verified in this prototype.',
-                            prefixIcon: Icon(Icons.directions_bus_outlined),
-                          ),
-                          validator: _validateVehicleInput,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _selectedVehicleCountLabel,
-                          key: const ValueKey('selected-vehicle-count'),
-                          style: Theme.of(context).textTheme.labelLarge
-                              ?.copyWith(
-                                color: const Color(0xFF5636C7),
-                                fontWeight: FontWeight.w700,
-                              ),
-                        ),
-                        if (!_isEditMode &&
-                            widget.prefill?.suggestedVehicleCount != null) ...[
-                          const SizedBox(height: 10),
-                          _SuggestedVehicleNotice(
-                            count: widget.prefill!.suggestedVehicleCount!,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _FormSection(
-                    title: 'Service window',
-                    icon: Icons.schedule_outlined,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _DateTimeControls(
-                          prefix: 'start',
-                          label: 'Start',
-                          value: _startTime,
-                          enabled: !_isReadOnly && !_isSubmitting,
-                          onPickDate: () => _pickDate(isStart: true),
-                          onPickTime: () => _pickTime(isStart: true),
-                        ),
-                        const SizedBox(height: 12),
-                        _DateTimeControls(
-                          prefix: 'end',
-                          label: 'End',
-                          value: _endTime,
-                          enabled: !_isReadOnly && !_isSubmitting,
-                          onPickDate: () => _pickDate(isStart: false),
-                          onPickTime: () => _pickTime(isStart: false),
-                        ),
-                        if (_timeError != null) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            _timeError!,
-                            key: const ValueKey('service-window-error'),
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _FormSection(
-                    title: 'Operational purpose',
-                    icon: Icons.description_outlined,
-                    child: TextFormField(
-                      key: const ValueKey('purpose-field'),
-                      controller: _purposeController,
-                      readOnly: _isReadOnly,
-                      minLines: 3,
-                      maxLines: 6,
-                      textInputAction: TextInputAction.newline,
-                      decoration: const InputDecoration(
-                        labelText: 'Purpose',
-                        alignLabelWithHint: true,
-                        hintText: 'Explain why this deployment is required',
-                      ),
-                      validator: (value) =>
-                          _requiredText(value, 'Purpose is required.'),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _FormSection(
-                    title: 'Linked records',
-                    icon: Icons.link_outlined,
-                    child: Column(
-                      children: [
-                        TextFormField(
-                          key: const ValueKey('incident-id-field'),
-                          controller: _incidentIdController,
-                          readOnly: _isReadOnly,
-                          textInputAction: TextInputAction.next,
-                          decoration: const InputDecoration(
-                            labelText: 'Incident ID (optional)',
-                            prefixIcon: Icon(Icons.warning_amber_outlined),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          key: const ValueKey('recommendation-id-field'),
-                          controller: _recommendationIdController,
-                          readOnly: _isReadOnly,
-                          decoration: const InputDecoration(
-                            labelText: 'Recommendation ID (optional)',
-                            helperText: 'Recommendations pre-fill data only. Staff decides.',
-                            prefixIcon: Icon(Icons.lightbulb_outline),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  _buildActions(),
+        child: Form(
+          key: _formKey,
+          autovalidateMode: _showValidation
+              ? AutovalidateMode.onUserInteraction
+              : AutovalidateMode.disabled,
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.xl,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const _PrototypeNotice(),
+                if (_isReadOnly) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  _ReadOnlyNotice(status: widget.existingDeployment!.status),
                 ],
-              ),
+                if (_isSubmitting) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  const LinearProgressIndicator(
+                    key: ValueKey('deployment-form-progress'),
+                  ),
+                ],
+                if (_submissionError != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  _SubmissionError(message: _submissionError!),
+                ],
+                const SizedBox(height: AppSpacing.md),
+                _FormSection(
+                  title: 'Deployment',
+                  icon: Icons.assignment_outlined,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextFormField(
+                        key: const ValueKey('deployment-id-field'),
+                        controller: _deploymentIdController,
+                        readOnly: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Deployment ID',
+                          helperText: 'Generated automatically and read-only',
+                          prefixIcon: Icon(Icons.tag),
+                        ),
+                        validator: _requiredDeploymentId,
+                      ),
+                      if (_isEditMode) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: AppSpacing.sm,
+                          runSpacing: AppSpacing.xs,
+                          children: [
+                            const Text('Current status'),
+                            DeploymentStatusChip(
+                              status: widget.existingDeployment!.status,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _FormSection(
+                  title: 'Route and vehicles',
+                  icon: Icons.route_outlined,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextFormField(
+                        key: const ValueKey('route-id-field'),
+                        controller: _routeIdController,
+                        readOnly: _isReadOnly,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          labelText: 'Route ID',
+                          helperText: 'Prototype entry — not connected to GTFS route data',
+                          prefixIcon: Icon(Icons.signpost_outlined),
+                        ),
+                        validator: (value) =>
+                            _requiredText(value, 'Route ID is required.'),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      TextFormField(
+                        key: const ValueKey('route-name-field'),
+                        controller: _routeNameController,
+                        readOnly: _isReadOnly,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          labelText: 'Route name',
+                          prefixIcon: Icon(Icons.alt_route_outlined),
+                        ),
+                        validator: (value) =>
+                            _requiredText(value, 'Route name is required.'),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      TextFormField(
+                        key: const ValueKey('vehicle-ids-field'),
+                        controller: _vehicleIdsController,
+                        readOnly: _isReadOnly,
+                        keyboardType: TextInputType.text,
+                        textInputAction: TextInputAction.next,
+                        onChanged: (_) => setState(() {}),
+                        decoration: const InputDecoration(
+                          labelText: 'Vehicle IDs',
+                          hintText: 'ABC 1230, DEF 4567',
+                          helperText:
+                              'Enter actual vehicle IDs separated by commas. '
+                              'Availability is not verified in this prototype.',
+                          prefixIcon: Icon(Icons.directions_bus_outlined),
+                        ),
+                        validator: _validateVehicleInput,
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        _selectedVehicleCountLabel,
+                        key: const ValueKey('selected-vehicle-count'),
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (!_isEditMode &&
+                          widget.prefill?.suggestedVehicleCount != null) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        _SuggestedVehicleNotice(
+                          count: widget.prefill!.suggestedVehicleCount!,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _FormSection(
+                  title: 'Service window',
+                  icon: Icons.schedule_outlined,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _DateTimeControls(
+                        prefix: 'start',
+                        label: 'Start',
+                        value: _startTime,
+                        enabled: !_isReadOnly && !_isSubmitting,
+                        onPickDate: () => _pickDate(isStart: true),
+                        onPickTime: () => _pickTime(isStart: true),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      _DateTimeControls(
+                        prefix: 'end',
+                        label: 'End',
+                        value: _endTime,
+                        enabled: !_isReadOnly && !_isSubmitting,
+                        onPickDate: () => _pickDate(isStart: false),
+                        onPickTime: () => _pickTime(isStart: false),
+                      ),
+                      if (_timeError != null) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          _timeError!,
+                          key: const ValueKey('service-window-error'),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _FormSection(
+                  title: 'Operational purpose',
+                  icon: Icons.description_outlined,
+                  child: TextFormField(
+                    key: const ValueKey('purpose-field'),
+                    controller: _purposeController,
+                    readOnly: _isReadOnly,
+                    minLines: 3,
+                    maxLines: 6,
+                    textInputAction: TextInputAction.newline,
+                    decoration: const InputDecoration(
+                      labelText: 'Purpose',
+                      alignLabelWithHint: true,
+                      hintText: 'Explain why this deployment is required',
+                    ),
+                    validator: (value) =>
+                        _requiredText(value, 'Purpose is required.'),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _FormSection(
+                  title: 'Linked records',
+                  icon: Icons.link_outlined,
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        key: const ValueKey('incident-id-field'),
+                        controller: _incidentIdController,
+                        readOnly: _isReadOnly,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          labelText: 'Incident ID (optional)',
+                          prefixIcon: Icon(Icons.warning_amber_outlined),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      TextFormField(
+                        key: const ValueKey('recommendation-id-field'),
+                        controller: _recommendationIdController,
+                        readOnly: _isReadOnly,
+                        decoration: const InputDecoration(
+                          labelText: 'Recommendation ID (optional)',
+                          helperText: 'Recommendations pre-fill data only. Staff decides.',
+                          prefixIcon: Icon(Icons.lightbulb_outline),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                _buildActions(),
+              ],
             ),
           ),
         ),
@@ -374,35 +373,27 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
           onPressed: _isSubmitting ? null : () => _submit(schedule: false),
           icon: const Icon(Icons.save_outlined),
           label: Text(_isEditMode ? 'Save Changes' : 'Save Draft'),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-            backgroundColor: const Color(0xFF6D4AFF),
-          ),
         ),
       );
       if (_canSchedule) {
         buttons.addAll([
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.sm),
           OutlinedButton.icon(
             key: const ValueKey('schedule-deployment-button'),
             onPressed: _isSubmitting ? null : () => _submit(schedule: true),
             icon: const Icon(Icons.event_available_outlined),
             label: const Text('Schedule Deployment'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
-            ),
           ),
         ]);
       }
     }
     if (buttons.isNotEmpty) {
-      buttons.add(const SizedBox(height: 10));
+      buttons.add(const SizedBox(height: AppSpacing.sm));
     }
     buttons.add(
       TextButton(
         key: const ValueKey('cancel-deployment-button'),
         onPressed: _isSubmitting ? null : widget.onCancel,
-        style: TextButton.styleFrom(minimumSize: const Size.fromHeight(48)),
         child: const Text('Cancel'),
       ),
     );
@@ -647,39 +638,10 @@ class _FormSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, size: 20, color: const Color(0xFF6D4AFF)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: const Color(0xFF17203A),
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            child,
-          ],
-        ),
-      ),
+    return AppSectionCard(
+      title: title,
+      leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
+      body: child,
     );
   }
 }
@@ -714,27 +676,21 @@ class _DateTimeControls extends StatelessWidget {
             style: Theme.of(context).textTheme.labelLarge
                 ?.copyWith(fontWeight: FontWeight.w700),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.xs),
           OutlinedButton.icon(
             key: ValueKey('$prefix-date-button'),
             onPressed: enabled ? onPickDate : null,
             icon: const Icon(Icons.calendar_today_outlined),
             label: Text(_formatDate(value)),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
-              alignment: Alignment.centerLeft,
-            ),
+            style: OutlinedButton.styleFrom(alignment: Alignment.centerLeft),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.xs),
           OutlinedButton.icon(
             key: ValueKey('$prefix-time-button'),
             onPressed: enabled ? onPickTime : null,
             icon: const Icon(Icons.access_time),
             label: Text(_formatTime(value)),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
-              alignment: Alignment.centerLeft,
-            ),
+            style: OutlinedButton.styleFrom(alignment: Alignment.centerLeft),
           ),
         ],
       ),
@@ -763,21 +719,24 @@ class _PrototypeNotice extends StatelessWidget {
       label: 'Prototype data, not live operations',
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: const Color(0xFFF1EFFF),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFD8D0FF)),
+          color: AppColors.developmentContainer,
+          borderRadius: AppRadius.medium,
+          border: Border.all(color: AppColors.developmentBorder),
         ),
         child: const Padding(
-          padding: EdgeInsets.all(12),
+          padding: EdgeInsets.all(AppSpacing.sm),
           child: Row(
             children: [
-              Icon(Icons.science_outlined, size: 20, color: Color(0xFF5636C7)),
-              SizedBox(width: 10),
+              Icon(
+                Icons.science_outlined,
+                color: AppColors.onDevelopmentContainer,
+              ),
+              SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
                   'Prototype data — not live operations',
                   style: TextStyle(
-                    color: Color(0xFF402596),
+                    color: AppColors.onDevelopmentContainer,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -802,28 +761,29 @@ class _SuggestedVehicleNotice extends StatelessWidget {
       label: 'Recommended vehicle count guidance',
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: const Color(0xFFF7F5FF),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFD8D0FF)),
+          color: Theme.of(context).colorScheme.primaryContainer,
+          borderRadius: AppRadius.medium,
         ),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(AppSpacing.sm),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(
+              Icon(
                 Icons.lightbulb_outline,
                 size: 20,
-                color: Color(0xFF5636C7),
+                color: Theme.of(context).colorScheme.primary,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.xs),
               Expanded(
                 child: Text(
                   'Recommendation suggests $count '
                   '${count == 1 ? 'vehicle' : 'vehicles'}. '
                   'Staff must select the actual vehicles.',
                   key: const ValueKey('suggested-vehicle-count'),
-                  style: const TextStyle(color: Color(0xFF402596)),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
                 ),
               ),
             ],
@@ -843,24 +803,23 @@ class _ReadOnlyNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF7ED),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFDBA74)),
+        color: AppColors.warningContainer,
+        borderRadius: AppRadius.medium,
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(AppSpacing.sm),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.lock_outline, color: Color(0xFF9A3412)),
-            const SizedBox(width: 10),
+            const Icon(Icons.lock_outline, color: AppColors.onWarningContainer),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
                 '${status.displayLabel} deployments are operational or '
                 'terminal records and cannot be edited here.',
                 key: const ValueKey('read-only-deployment-message'),
                 style: const TextStyle(
-                  color: Color(0xFF7C2D12),
+                  color: AppColors.onWarningContainer,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -879,27 +838,28 @@ class _SubmissionError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Semantics(
       container: true,
       liveRegion: true,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: const Color(0xFFFEE2E2),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFFCA5A5)),
+          color: colorScheme.errorContainer,
+          borderRadius: AppRadius.medium,
         ),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(AppSpacing.sm),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.error_outline, color: Color(0xFF991B1B)),
-              const SizedBox(width: 10),
+              Icon(Icons.error_outline, color: colorScheme.onErrorContainer),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
                   message,
                   key: const ValueKey('deployment-form-error'),
-                  style: const TextStyle(color: Color(0xFF7F1D1D)),
+                  style: TextStyle(color: colorScheme.onErrorContainer),
                 ),
               ),
             ],

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:prasa_assist/features/deployments/deployment_demo_app.dart';
+import 'package:prasa_assist/core/theme/app_theme.dart';
 import 'package:prasa_assist/features/deployments/screens/deployment_detail_screen.dart';
 import 'package:prasa_assist/features/deployments/screens/deployment_form_screen.dart';
 import 'package:prasa_assist/features/deployments/screens/deployment_list_screen.dart';
+import 'package:prasa_assist/features/deployments/service_deployment_page.dart';
 
 void main() {
   testWidgets('launches the Module 3 demo with DEP-120 seed data', (
@@ -15,6 +16,7 @@ void main() {
     expect(app.title, 'PrasaAssist — Service Deployment');
     expect(app.debugShowCheckedModeBanner, isFalse);
     expect(app.theme!.useMaterial3, isTrue);
+    expect(find.byType(ServiceDeploymentPage), findsOneWidget);
     expect(find.byType(DeploymentListScreen), findsOneWidget);
     expect(find.text('DEP-120'), findsOneWidget);
   });
@@ -291,10 +293,15 @@ final _testClock = DateTime(2026, 8, 27, 12);
 
 Future<void> _pumpDemo(WidgetTester tester) async {
   await tester.pumpWidget(
-    DeploymentDemoApp(
-      clock: () => _testClock,
-      deploymentIdGenerator: (sequence) =>
-          'DEP-TEST-${sequence.toString().padLeft(3, '0')}',
+    MaterialApp(
+      title: 'PrasaAssist \u2014 Service Deployment',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light,
+      home: ServiceDeploymentPage(
+        clock: () => _testClock,
+        deploymentIdGenerator: (sequence) =>
+            'DEP-TEST-${sequence.toString().padLeft(3, '0')}',
+      ),
     ),
   );
   await tester.pump();
