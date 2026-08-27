@@ -1,5 +1,6 @@
 import '../models/deployment_status.dart';
 import '../models/service_deployment.dart';
+import 'deployment_data_exception.dart';
 import 'deployment_repository.dart';
 
 /// In-memory storage for development and demonstration only.
@@ -57,30 +58,45 @@ class InMemoryDeploymentRepository implements DeploymentRepository {
   }
 
   @override
-  Future<void> create(ServiceDeployment deployment) async {
+  Future<ServiceDeployment> create(ServiceDeployment deployment) async {
     _validate(deployment);
     if (_deployments.containsKey(deployment.deploymentId)) {
-      throw StateError(
+      throw DeploymentDuplicateException(
         'A deployment with ID ${deployment.deploymentId} already exists.',
       );
     }
-    _deployments[deployment.deploymentId] = deployment.copyWith();
+    final created = deployment.copyWith();
+    _deployments[deployment.deploymentId] = created;
+    return created.copyWith();
   }
 
   @override
-  Future<void> update(ServiceDeployment deployment) async {
+  Future<ServiceDeployment> update(ServiceDeployment deployment) async {
     _validate(deployment);
-    if (!_deployments.containsKey(deployment.deploymentId)) {
-      throw StateError('Deployment ${deployment.deploymentId} does not exist.');
+    final current = _deployments[deployment.deploymentId];
+    if (current == null) {
+      throw DeploymentNotFoundException(
+        'Deployment ${deployment.deploymentId} does not exist.',
+      );
     }
-    _deployments[deployment.deploymentId] = deployment.copyWith();
+    if (deployment.version != current.version) {
+      throw DeploymentConflictException(
+        'Deployment ${deployment.deploymentId} was changed by another operation. '
+        'Reload it and try again.',
+      );
+    }
+    final updated = deployment.copyWith(version: current.version + 1);
+    _deployments[deployment.deploymentId] = updated;
+    return updated.copyWith();
   }
 
   @override
   Future<void> delete(String deploymentId) async {
     final deployment = _deployments[deploymentId];
     if (deployment == null) {
-      throw StateError('Deployment $deploymentId does not exist.');
+      throw DeploymentNotFoundException(
+        'Deployment $deploymentId does not exist.',
+      );
     }
     if (deployment.status != DeploymentStatus.draft &&
         deployment.status != DeploymentStatus.cancelled) {
@@ -89,10 +105,44 @@ class InMemoryDeploymentRepository implements DeploymentRepository {
     _deployments.remove(deploymentId);
   }
 
+  @override
+  Future<ServiceDeployment> transitionStatus(
+    String deploymentCode,
+    DeploymentStatus targetStatus, {
+    required String changedByLabel,
+    DateTime? changedAt,
+  }) async {
+    if (changedByLabel.trim().isEmpty) {
+      throw const DeploymentValidationException(
+        'A staff label is required to change deployment status.',
+      );
+    }
+    final current = _deployments[deploymentCode];
+    if (current == null) {
+      throw DeploymentNotFoundException(
+        'Deployment $deploymentCode does not exist.',
+      );
+    }
+    if (!current.status.canTransitionTo(targetStatus)) {
+      throw DeploymentValidationException(
+        'Cannot change deployment status from '
+        '${current.status.displayLabel} to ${targetStatus.displayLabel}.',
+      );
+    }
+    final updated = current.copyWith(
+      status: targetStatus,
+      updatedAt: changedAt ?? DateTime.now(),
+      version: current.version + 1,
+    );
+    _validate(updated);
+    _deployments[deploymentCode] = updated;
+    return updated.copyWith();
+  }
+
   void _validate(ServiceDeployment deployment) {
     final errors = deployment.validate();
     if (errors.isNotEmpty) {
-      throw ArgumentError(errors.join(' '), 'deployment');
+      throw DeploymentValidationException(errors.join(' '));
     }
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prasa_assist/features/deployments/models/deployment_status.dart';
 import 'package:prasa_assist/features/deployments/models/service_deployment.dart';
+import 'package:prasa_assist/features/deployments/repositories/deployment_data_exception.dart';
 import 'package:prasa_assist/features/deployments/repositories/in_memory_deployment_repository.dart';
 
 void main() {
@@ -41,7 +42,7 @@ void main() {
       await expectLater(
         repository.create(_deployment(purpose: 'Duplicate deployment')),
         throwsA(
-          isA<StateError>().having(
+          isA<DeploymentDuplicateException>().having(
             (error) => error.message,
             'message',
             contains('already exists'),
@@ -59,9 +60,45 @@ void main() {
         purpose: 'Updated operational purpose',
         updatedAt: deployment.updatedAt.add(const Duration(minutes: 5)),
       );
-      await repository.update(updated);
+      final result = await repository.update(updated);
 
-      expect(await repository.getById(deployment.deploymentId), updated);
+      expect(result, updated.copyWith(version: 2));
+      expect(await repository.getById(deployment.deploymentId), result);
+    });
+
+    test(
+      'rejects a stale update version without changing stored data',
+      () async {
+        final repository = InMemoryDeploymentRepository(
+          seedData: [_deployment().copyWith(version: 2)],
+        );
+
+        await expectLater(
+          repository.update(_deployment(version: 1)),
+          throwsA(isA<DeploymentConflictException>()),
+        );
+
+        expect((await repository.getById('DEP-001'))!.version, 2);
+      },
+    );
+
+    test('atomically transitions status and increments version', () async {
+      final repository = InMemoryDeploymentRepository(
+        seedData: [_deployment()],
+      );
+      final changedAt = DateTime(2026, 8, 27, 8);
+
+      final transitioned = await repository.transitionStatus(
+        'DEP-001',
+        DeploymentStatus.scheduled,
+        changedByLabel: 'Operations Staff',
+        changedAt: changedAt,
+      );
+
+      expect(transitioned.status, DeploymentStatus.scheduled);
+      expect(transitioned.updatedAt, changedAt);
+      expect(transitioned.version, 2);
+      expect((await repository.getById('DEP-001'))!.version, 2);
     });
 
     test('rejects update for a missing deployment', () async {
@@ -70,7 +107,7 @@ void main() {
       await expectLater(
         repository.update(_deployment()),
         throwsA(
-          isA<StateError>().having(
+          isA<DeploymentNotFoundException>().having(
             (error) => error.message,
             'message',
             contains('does not exist'),
@@ -85,7 +122,7 @@ void main() {
       await expectLater(
         repository.delete('MISSING'),
         throwsA(
-          isA<StateError>().having(
+          isA<DeploymentNotFoundException>().having(
             (error) => error.message,
             'message',
             contains('does not exist'),
@@ -144,7 +181,7 @@ void main() {
       await expectLater(
         repository.create(_deployment(routeId: '')),
         throwsA(
-          isA<ArgumentError>().having(
+          isA<DeploymentValidationException>().having(
             (error) => error.message,
             'message',
             contains('Route ID is required.'),
@@ -157,7 +194,7 @@ void main() {
       await expectLater(
         repository.update(validDeployment.copyWith(vehicleIds: const [])),
         throwsA(
-          isA<ArgumentError>().having(
+          isA<DeploymentValidationException>().having(
             (error) => error.message,
             'message',
             contains('At least one vehicle must be selected.'),
@@ -199,6 +236,7 @@ ServiceDeployment _deployment({
   String routeId = '300',
   DeploymentStatus status = DeploymentStatus.draft,
   String purpose = 'Provide replacement service',
+  int version = 1,
 }) {
   return ServiceDeployment(
     deploymentId: deploymentId,
@@ -212,5 +250,6 @@ ServiceDeployment _deployment({
     createdBy: 'Operations Staff',
     createdAt: DateTime(2026, 8, 27, 7, 30),
     updatedAt: DateTime(2026, 8, 27, 7, 45),
+    version: version,
   );
 }

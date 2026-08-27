@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/deployment_status.dart';
 import '../models/service_deployment.dart';
+import '../repositories/deployment_data_exception.dart';
 import '../repositories/deployment_repository.dart';
 
 class DeploymentController extends ChangeNotifier {
@@ -60,15 +61,13 @@ class DeploymentController extends ChangeNotifier {
 
   Future<bool> createDeployment(ServiceDeployment deployment) async {
     return _runMutation(() async {
-      await _repository.create(deployment);
-      _selectedDeployment = deployment.copyWith();
+      _selectedDeployment = await _repository.create(deployment);
     });
   }
 
   Future<bool> updateDeployment(ServiceDeployment deployment) async {
     return _runMutation(() async {
-      await _repository.update(deployment);
-      _selectedDeployment = deployment.copyWith();
+      _selectedDeployment = await _repository.update(deployment);
     });
   }
 
@@ -85,25 +84,18 @@ class DeploymentController extends ChangeNotifier {
     String deploymentId,
     DeploymentStatus nextStatus, {
     DateTime? updatedAt,
+    String? changedByLabel,
   }) async {
     return _runMutation(() async {
-      final deployment = await _repository.getById(deploymentId);
-      if (deployment == null) {
-        throw StateError('Deployment $deploymentId does not exist.');
-      }
-      if (!deployment.status.canTransitionTo(nextStatus)) {
-        throw StateError(
-          'Cannot change deployment status from '
-          '${deployment.status.displayLabel} to ${nextStatus.displayLabel}.',
-        );
-      }
-
-      final updatedDeployment = deployment.copyWith(
-        status: nextStatus,
-        updatedAt: updatedAt ?? _clock(),
+      final actorLabel = changedByLabel?.trim().isNotEmpty == true
+          ? changedByLabel!.trim()
+          : _selectedDeployment?.createdBy ?? 'Operations Staff';
+      _selectedDeployment = await _repository.transitionStatus(
+        deploymentId,
+        nextStatus,
+        changedByLabel: actorLabel,
+        changedAt: updatedAt ?? _clock(),
       );
-      await _repository.update(updatedDeployment);
-      _selectedDeployment = updatedDeployment;
     });
   }
 
@@ -133,6 +125,9 @@ class DeploymentController extends ChangeNotifier {
   }
 
   String _readableError(Object error) {
+    if (error is DeploymentDataException) {
+      return error.message;
+    }
     if (error is ArgumentError) {
       return error.message?.toString() ?? 'Invalid deployment data.';
     }

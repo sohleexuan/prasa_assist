@@ -13,6 +13,7 @@ class ServiceDeployment {
     required this.createdBy,
     required this.createdAt,
     required this.updatedAt,
+    this.version = 1,
     this.incidentId,
     this.sourceRecommendationId,
   }) : _vehicleIds = List<String>.unmodifiable(vehicleIds);
@@ -30,6 +31,7 @@ class ServiceDeployment {
   final String createdBy;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final int version;
   final String? incidentId;
   final String? sourceRecommendationId;
 
@@ -58,7 +60,8 @@ class ServiceDeployment {
     if (normalizedVehicleIds.any((vehicleId) => vehicleId.isEmpty)) {
       errors.add('Vehicle IDs cannot be empty.');
     }
-    if (normalizedVehicleIds.toSet().length != normalizedVehicleIds.length) {
+    if (normalizedVehicleIds.map((id) => id.toLowerCase()).toSet().length !=
+        normalizedVehicleIds.length) {
       errors.add('Vehicle IDs cannot contain duplicates.');
     }
     if (!endTime.isAfter(startTime)) {
@@ -72,6 +75,9 @@ class ServiceDeployment {
     }
     if (updatedAt.isBefore(createdAt)) {
       errors.add('Updated time cannot be earlier than created time.');
+    }
+    if (version < 1) {
+      errors.add('Version must be at least 1.');
     }
     if (incidentId != null && incidentId!.trim().isEmpty) {
       errors.add('Incident ID cannot be blank when provided.');
@@ -96,6 +102,7 @@ class ServiceDeployment {
     String? createdBy,
     DateTime? createdAt,
     DateTime? updatedAt,
+    int? version,
     Object? incidentId = _notProvided,
     Object? sourceRecommendationId = _notProvided,
   }) {
@@ -111,6 +118,7 @@ class ServiceDeployment {
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      version: version ?? this.version,
       incidentId: identical(incidentId, _notProvided)
           ? this.incidentId
           : incidentId as String?,
@@ -135,6 +143,7 @@ class ServiceDeployment {
             createdBy == other.createdBy &&
             createdAt == other.createdAt &&
             updatedAt == other.updatedAt &&
+            version == other.version &&
             incidentId == other.incidentId &&
             sourceRecommendationId == other.sourceRecommendationId;
   }
@@ -152,6 +161,7 @@ class ServiceDeployment {
     createdBy,
     createdAt,
     updatedAt,
+    version,
     incidentId,
     sourceRecommendationId,
   );

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:prasa_assist/features/deployments/controllers/deployment_controller.dart';
 import 'package:prasa_assist/features/deployments/models/deployment_status.dart';
 import 'package:prasa_assist/features/deployments/models/service_deployment.dart';
+import 'package:prasa_assist/features/deployments/repositories/deployment_data_exception.dart';
 import 'package:prasa_assist/features/deployments/repositories/in_memory_deployment_repository.dart';
 
 void main() {
@@ -70,7 +71,7 @@ void main() {
         updatedAt: deployment.updatedAt.add(const Duration(minutes: 1)),
       );
       expect(await controller.updateDeployment(updated), isTrue);
-      expect(controller.deployments.single, updated);
+      expect(controller.deployments.single, updated.copyWith(version: 2));
 
       expect(
         await controller.deleteDeployment(deployment.deploymentId),
@@ -124,6 +125,58 @@ void main() {
         expect(stored!.status, nextStatus);
         expect(stored.updatedAt.isAfter(previousUpdatedAt), isTrue);
         expect(controller.deployments.single.status, nextStatus);
+      }
+    });
+
+    test(
+      'delegates status changes to the repository atomic operation',
+      () async {
+        final deployment = _deployment();
+        final repository = _TransitionRecordingRepository(
+          seedData: [deployment],
+        );
+        final controller = DeploymentController(repository: repository);
+        await controller.getDeploymentById(deployment.deploymentId);
+
+        expect(
+          await controller.changeStatus(
+            deployment.deploymentId,
+            DeploymentStatus.scheduled,
+            changedByLabel: 'Control Centre Staff',
+          ),
+          isTrue,
+        );
+
+        expect(repository.transitionCallCount, 1);
+        expect(repository.updateCallCount, 0);
+        expect(repository.changedByLabel, 'Control Centre Staff');
+        expect(controller.selectedDeployment!.version, 2);
+      },
+    );
+
+    test('exposes offline and conflict failures using safe messages', () async {
+      for (final exception in <DeploymentDataException>[
+        const DeploymentOfflineException(
+          'Deployment data is unavailable while offline.',
+        ),
+        const DeploymentConflictException(
+          'Deployment changed elsewhere. Reload and try again.',
+        ),
+      ]) {
+        final controller = DeploymentController(
+          repository: _FailingTransitionRepository(exception),
+        );
+
+        expect(
+          await controller.changeStatus(
+            'DEP-001',
+            DeploymentStatus.scheduled,
+            changedByLabel: 'Operations Staff',
+          ),
+          isFalse,
+        );
+        expect(controller.errorMessage, exception.message);
+        expect(controller.selectedDeployment, isNull);
       }
     });
 
@@ -213,6 +266,53 @@ class _DelayedRepository extends InMemoryDeploymentRepository {
 
   void completeGetAll(List<ServiceDeployment> deployments) {
     _getAllCompleter.complete(deployments);
+  }
+}
+
+class _TransitionRecordingRepository extends InMemoryDeploymentRepository {
+  _TransitionRecordingRepository({required super.seedData});
+
+  int transitionCallCount = 0;
+  int updateCallCount = 0;
+  String? changedByLabel;
+
+  @override
+  Future<ServiceDeployment> update(ServiceDeployment deployment) {
+    updateCallCount++;
+    return super.update(deployment);
+  }
+
+  @override
+  Future<ServiceDeployment> transitionStatus(
+    String deploymentCode,
+    DeploymentStatus targetStatus, {
+    required String changedByLabel,
+    DateTime? changedAt,
+  }) {
+    transitionCallCount++;
+    this.changedByLabel = changedByLabel;
+    return super.transitionStatus(
+      deploymentCode,
+      targetStatus,
+      changedByLabel: changedByLabel,
+      changedAt: changedAt,
+    );
+  }
+}
+
+class _FailingTransitionRepository extends InMemoryDeploymentRepository {
+  _FailingTransitionRepository(this.exception);
+
+  final DeploymentDataException exception;
+
+  @override
+  Future<ServiceDeployment> transitionStatus(
+    String deploymentCode,
+    DeploymentStatus targetStatus, {
+    required String changedByLabel,
+    DateTime? changedAt,
+  }) {
+    throw exception;
   }
 }
 

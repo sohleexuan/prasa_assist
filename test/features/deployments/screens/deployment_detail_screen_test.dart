@@ -797,7 +797,12 @@ class _FailingUpdateRepository extends InMemoryDeploymentRepository {
   _FailingUpdateRepository({required super.seedData});
 
   @override
-  Future<void> update(ServiceDeployment deployment) {
+  Future<ServiceDeployment> transitionStatus(
+    String deploymentCode,
+    DeploymentStatus targetStatus, {
+    required String changedByLabel,
+    DateTime? changedAt,
+  }) {
     throw StateError('Test status failure');
   }
 }
@@ -818,10 +823,20 @@ class _DelayedUpdateRepository extends InMemoryDeploymentRepository {
   int updateCallCount = 0;
 
   @override
-  Future<void> update(ServiceDeployment deployment) async {
+  Future<ServiceDeployment> transitionStatus(
+    String deploymentCode,
+    DeploymentStatus targetStatus, {
+    required String changedByLabel,
+    DateTime? changedAt,
+  }) async {
     updateCallCount++;
     await _releaseCompleter.future;
-    await super.update(deployment);
+    return super.transitionStatus(
+      deploymentCode,
+      targetStatus,
+      changedByLabel: changedByLabel,
+      changedAt: changedAt,
+    );
   }
 
   void release() => _releaseCompleter.complete();

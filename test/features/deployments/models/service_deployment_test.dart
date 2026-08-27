@@ -169,6 +169,14 @@ void main() {
       );
     });
 
+    test('defaults version to 1 and rejects versions below 1', () {
+      expect(_deployment().version, 1);
+      expect(
+        _deployment(version: 0).validate(),
+        contains('Version must be at least 1.'),
+      );
+    });
+
     test('copyWith changes requested values and preserves the rest', () {
       final original = _deployment();
       final newUpdatedAt = original.updatedAt.add(const Duration(minutes: 5));
@@ -178,6 +186,7 @@ void main() {
         vehicleIds: const ['GHI 8901'],
         status: DeploymentStatus.scheduled,
         updatedAt: newUpdatedAt,
+        version: 4,
       );
 
       expect(copy.deploymentId, original.deploymentId);
@@ -186,6 +195,7 @@ void main() {
       expect(copy.vehicleIds, ['GHI 8901']);
       expect(copy.status, DeploymentStatus.scheduled);
       expect(copy.updatedAt, newUpdatedAt);
+      expect(copy.version, 4);
       expect(copy.incidentId, original.incidentId);
       expect(copy.sourceRecommendationId, original.sourceRecommendationId);
       expect(original.routeId, '300');
@@ -208,6 +218,7 @@ void main() {
       expect(equalCopy, first);
       expect(equalCopy.hashCode, first.hashCode);
       expect(first.copyWith(purpose: 'Different purpose'), isNot(first));
+      expect(first.copyWith(version: 2), isNot(first));
     });
   });
 }
@@ -224,6 +235,7 @@ ServiceDeployment _deployment({
   String createdBy = 'Operations Staff',
   DateTime? createdAt,
   DateTime? updatedAt,
+  int version = 1,
   String? incidentId = 'INC-001',
   String? sourceRecommendationId = 'REC-001',
 }) {
@@ -239,6 +251,7 @@ ServiceDeployment _deployment({
     createdBy: createdBy,
     createdAt: createdAt ?? DateTime(2026, 8, 27, 7, 30),
     updatedAt: updatedAt ?? DateTime(2026, 8, 27, 7, 45),
+    version: version,
     incidentId: incidentId,
     sourceRecommendationId: sourceRecommendationId,
   );

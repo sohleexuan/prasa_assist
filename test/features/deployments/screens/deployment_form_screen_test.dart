@@ -618,23 +618,39 @@ class _RecordingRepository extends InMemoryDeploymentRepository {
   int updateCallCount = 0;
 
   @override
-  Future<void> create(ServiceDeployment deployment) async {
+  Future<ServiceDeployment> create(ServiceDeployment deployment) async {
     createCallCount++;
     createdStatuses.add(deployment.status);
-    await super.create(deployment);
+    return super.create(deployment);
   }
 
   @override
-  Future<void> update(ServiceDeployment deployment) async {
+  Future<ServiceDeployment> update(ServiceDeployment deployment) async {
     updateCallCount++;
     updatedStatuses.add(deployment.status);
-    await super.update(deployment);
+    return super.update(deployment);
+  }
+
+  @override
+  Future<ServiceDeployment> transitionStatus(
+    String deploymentCode,
+    DeploymentStatus targetStatus, {
+    required String changedByLabel,
+    DateTime? changedAt,
+  }) async {
+    updatedStatuses.add(targetStatus);
+    return super.transitionStatus(
+      deploymentCode,
+      targetStatus,
+      changedByLabel: changedByLabel,
+      changedAt: changedAt,
+    );
   }
 }
 
 class _FailingCreateRepository extends InMemoryDeploymentRepository {
   @override
-  Future<void> create(ServiceDeployment deployment) {
+  Future<ServiceDeployment> create(ServiceDeployment deployment) {
     throw StateError('Test create failure');
   }
 }
@@ -644,10 +660,10 @@ class _DelayedCreateRepository extends InMemoryDeploymentRepository {
   int createCallCount = 0;
 
   @override
-  Future<void> create(ServiceDeployment deployment) async {
+  Future<ServiceDeployment> create(ServiceDeployment deployment) async {
     createCallCount++;
     await _createCompleter.future;
-    await super.create(deployment);
+    return super.create(deployment);
   }
 
   void completeCreate() {

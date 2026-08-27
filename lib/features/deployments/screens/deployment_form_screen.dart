@@ -441,6 +441,7 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
       createdBy: existing?.createdBy ?? widget.currentUserId.trim(),
       createdAt: existing?.createdAt ?? timestamp,
       updatedAt: timestamp,
+      version: existing?.version ?? 1,
       incidentId: _optionalText(_incidentIdController.text),
       sourceRecommendationId: _optionalText(_recommendationIdController.text),
     );
