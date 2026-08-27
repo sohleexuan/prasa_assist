@@ -4,11 +4,13 @@ import '../models/deployment_status.dart';
 import '../models/service_deployment.dart';
 import 'deployment_data_exception.dart';
 import 'deployment_repository.dart';
+import 'deployment_repository_capabilities.dart';
 
 /// Persistence-ready repository over a provider-neutral remote data source.
 ///
 /// This class does not connect Supabase, SQLite, HTTP or GTFS by itself.
-class PersistentDeploymentRepository implements DeploymentRepository {
+class PersistentDeploymentRepository
+    implements DeploymentRepository, DeploymentRepositoryCapabilitiesProvider {
   PersistentDeploymentRepository({
     required DeploymentRemoteDataSource dataSource,
     DeploymentMapper mapper = const DeploymentMapper(),
@@ -20,6 +22,10 @@ class PersistentDeploymentRepository implements DeploymentRepository {
   final DeploymentRemoteDataSource _dataSource;
   final DeploymentMapper _mapper;
   final DateTime Function() _clock;
+
+  @override
+  DeploymentRepositoryCapabilities get capabilities =>
+      const DeploymentRepositoryCapabilities.persistent();
 
   @override
   Future<List<ServiceDeployment>> getAll() async {
@@ -62,25 +68,9 @@ class PersistentDeploymentRepository implements DeploymentRepository {
 
   @override
   Future<void> delete(String deploymentId) async {
-    return _guard(() async {
-      final record = await _dataSource.fetchByCode(deploymentId);
-      if (record == null) {
-        throw DeploymentNotFoundException(
-          'Deployment $deploymentId does not exist.',
-        );
-      }
-      final deployment = _mapper.toDomain(record);
-      if (deployment.status != DeploymentStatus.draft &&
-          deployment.status != DeploymentStatus.cancelled) {
-        throw const DeploymentValidationException(
-          'Only Draft or Cancelled deployments may be deleted.',
-        );
-      }
-      await _dataSource.delete(
-        deploymentId,
-        expectedVersion: deployment.version,
-      );
-    });
+    throw const DeploymentPermissionException(
+      'Persistent deployment records cannot be physically deleted.',
+    );
   }
 
   @override

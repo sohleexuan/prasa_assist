@@ -75,6 +75,16 @@ void main() {
       expect(dto.toMap()['recommendation_id'], isNull);
     });
 
+    test('preserves a database actor UUID as a stable identifier', () {
+      const actorId = '00000000-0000-0000-0000-000000000001';
+      final dto = DeploymentRecordDto.fromMap(
+        _validMap()..['created_by_label'] = actorId,
+      );
+
+      expect(dto.createdByLabel, actorId);
+      expect(dto.toMap()['created_by_label'], actorId);
+    });
+
     test('rejects missing required fields', () {
       final map = _validMap()..remove('deployment_code');
 

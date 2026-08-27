@@ -129,43 +129,25 @@ void main() {
       },
     );
 
-    for (final status in [DeploymentStatus.draft, DeploymentStatus.cancelled]) {
-      test(
-        'deletes a ${status.displayLabel} record using its version',
-        () async {
-          final source = _FakeDeploymentRemoteDataSource(
-            seedData: [_record(status: status.name, version: 5)],
-          );
-          final repository = _repository(source);
-
-          await repository.delete('DEP-120');
-
-          expect(await repository.getById('DEP-120'), isNull);
-          expect(source.lastDeleteExpectedVersion, 5);
-        },
-      );
-    }
-
-    for (final status in [
-      DeploymentStatus.scheduled,
-      DeploymentStatus.active,
-      DeploymentStatus.completed,
-    ]) {
-      test('rejects deleting a ${status.displayLabel} record', () async {
+    test(
+      'reports persistent capabilities and never physically deletes',
+      () async {
         final source = _FakeDeploymentRemoteDataSource(
-          seedData: [_record(status: status.name)],
+          seedData: [_record(status: 'draft', version: 5)],
         );
         final repository = _repository(source);
 
+        expect(repository.capabilities.isPersistent, isTrue);
+        expect(repository.capabilities.supportsPhysicalDelete, isFalse);
+        expect(repository.capabilities.supportsReset, isFalse);
         await expectLater(
           repository.delete('DEP-120'),
-          throwsA(isA<DeploymentValidationException>()),
+          throwsA(isA<DeploymentPermissionException>()),
         );
-
         expect(source.deleteCallCount, 0);
         expect(await repository.getById('DEP-120'), isNotNull);
-      });
-    }
+      },
+    );
 
     final legalTransitions = <DeploymentStatus, List<DeploymentStatus>>{
       DeploymentStatus.draft: [
@@ -309,13 +291,13 @@ void main() {
       'propagates permission failure without exposing diagnostics',
       () async {
         final source = _FakeDeploymentRemoteDataSource(seedData: [_record()])
-          ..deleteError = const DeploymentPermissionException(
-            'You do not have permission to delete this deployment.',
+          ..updateError = const DeploymentPermissionException(
+            'You do not have permission to update this deployment.',
             cause: 'secret-token-must-not-be-in-the-message',
           );
 
         await expectLater(
-          _repository(source).delete('DEP-120'),
+          _repository(source).update(_deployment(version: 2)),
           throwsA(
             isA<DeploymentPermissionException>()
                 .having(

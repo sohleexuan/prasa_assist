@@ -18,12 +18,21 @@ void main() {
         expect(deployments.single.routeId, '300');
         expect(deployments.single.routeName, 'Route 300');
         expect(deployments.single.vehicleIds, ['ABC 1230', 'DEF 4567']);
+        expect(deployments.single.vehicleIds, isNot(contains('B1023')));
         expect(deployments.single.incidentId, 'INC-2026-0142');
         expect(deployments.single.sourceRecommendationId, 'REC-0088');
         expect(deployments.single.status, DeploymentStatus.scheduled);
         expect(deployments.single.validate(), isEmpty);
       },
     );
+
+    test('reports prototype delete and reset capabilities', () {
+      final repository = InMemoryDeploymentRepository();
+
+      expect(repository.capabilities.isPersistent, isFalse);
+      expect(repository.capabilities.supportsPhysicalDelete, isTrue);
+      expect(repository.capabilities.supportsReset, isTrue);
+    });
 
     test('creates and retrieves a deployment by ID', () async {
       final repository = InMemoryDeploymentRepository();

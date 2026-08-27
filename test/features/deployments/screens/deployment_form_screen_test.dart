@@ -189,6 +189,27 @@ void main() {
       );
     });
 
+    testWidgets(
+      'Schedule uses the authoritative deployment code returned by persistence',
+      (tester) async {
+        final repository = _ServerAssignedCodeRepository();
+        ServiceDeployment? savedDeployment;
+        await _pumpForm(
+          tester,
+          repository: repository,
+          onSaved: (deployment) => savedDeployment = deployment,
+        );
+        await _fillRequiredFields(tester);
+
+        await _submit(tester, 'schedule-deployment-button');
+
+        expect(repository.transitionedCode, 'DEP-121');
+        expect(savedDeployment!.deploymentId, 'DEP-121');
+        expect(savedDeployment!.status, DeploymentStatus.scheduled);
+        expect(await repository.getById('DEP-TEST-001'), isNull);
+      },
+    );
+
     testWidgets('does not call onSaved when repository creation fails', (
       tester,
     ) async {
@@ -652,6 +673,31 @@ class _FailingCreateRepository extends InMemoryDeploymentRepository {
   @override
   Future<ServiceDeployment> create(ServiceDeployment deployment) {
     throw StateError('Test create failure');
+  }
+}
+
+class _ServerAssignedCodeRepository extends InMemoryDeploymentRepository {
+  String? transitionedCode;
+
+  @override
+  Future<ServiceDeployment> create(ServiceDeployment deployment) {
+    return super.create(deployment.copyWith(deploymentId: 'DEP-121'));
+  }
+
+  @override
+  Future<ServiceDeployment> transitionStatus(
+    String deploymentCode,
+    DeploymentStatus targetStatus, {
+    required String changedByLabel,
+    DateTime? changedAt,
+  }) {
+    transitionedCode = deploymentCode;
+    return super.transitionStatus(
+      deploymentCode,
+      targetStatus,
+      changedByLabel: changedByLabel,
+      changedAt: changedAt,
+    );
   }
 }
 

@@ -114,7 +114,9 @@ class _DeploymentListScreenState extends State<DeploymentListScreen> {
             ),
             sliver: SliverList.list(
               children: [
-                const DeploymentDataNotice(),
+                DeploymentDataNotice(
+                  isPersistent: widget.controller.capabilities.isPersistent,
+                ),
                 const SizedBox(height: AppSpacing.md),
                 _DeploymentSummary(
                   totalCount: deployments.length,
@@ -151,7 +153,9 @@ class _DeploymentListScreenState extends State<DeploymentListScreen> {
           ),
           sliver: SliverList.list(
             children: [
-              const DeploymentDataNotice(),
+              DeploymentDataNotice(
+                isPersistent: widget.controller.capabilities.isPersistent,
+              ),
               const SizedBox(height: AppSpacing.md),
               _DeploymentSummary(
                 totalCount: deployments.length,

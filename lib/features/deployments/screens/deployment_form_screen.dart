@@ -144,7 +144,9 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const _PrototypeNotice(),
+                _PrototypeNotice(
+                  isPersistent: widget.controller.capabilities.isPersistent,
+                ),
                 if (_isReadOnly) ...[
                   const SizedBox(height: AppSpacing.sm),
                   _ReadOnlyNotice(status: widget.existingDeployment!.status),
@@ -206,10 +208,13 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
                         controller: _routeIdController,
                         readOnly: _isReadOnly,
                         textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Route ID',
-                          helperText: 'Prototype entry — not connected to GTFS route data',
-                          prefixIcon: Icon(Icons.signpost_outlined),
+                          helperText:
+                              widget.controller.capabilities.isPersistent
+                              ? 'Manual entry — not connected to GTFS route data'
+                              : 'Prototype entry — not connected to GTFS route data',
+                          prefixIcon: const Icon(Icons.signpost_outlined),
                         ),
                         validator: (value) =>
                             _requiredText(value, 'Route ID is required.'),
@@ -235,13 +240,16 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
                         keyboardType: TextInputType.text,
                         textInputAction: TextInputAction.next,
                         onChanged: (_) => setState(() {}),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Vehicle IDs',
                           hintText: 'ABC 1230, DEF 4567',
                           helperText:
-                              'Enter actual vehicle IDs separated by commas. '
-                              'Availability is not verified in this prototype.',
-                          prefixIcon: Icon(Icons.directions_bus_outlined),
+                              widget.controller.capabilities.isPersistent
+                              ? 'Enter actual vehicle IDs separated by commas. '
+                                    'Availability is not verified automatically.'
+                              : 'Enter actual vehicle IDs separated by commas. '
+                                    'Availability is not verified in this prototype.',
+                          prefixIcon: const Icon(Icons.directions_bus_outlined),
                         ),
                         validator: _validateVehicleInput,
                       ),
@@ -469,8 +477,9 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
     }
 
     if (schedule) {
+      final persistedDeployment = widget.controller.selectedDeployment;
       final scheduled = await widget.controller.changeStatus(
-        deployment.deploymentId,
+        persistedDeployment?.deploymentId ?? deployment.deploymentId,
         DeploymentStatus.scheduled,
       );
       if (!mounted) {
@@ -711,32 +720,38 @@ class _DateTimeControls extends StatelessWidget {
 }
 
 class _PrototypeNotice extends StatelessWidget {
-  const _PrototypeNotice();
+  const _PrototypeNotice({required this.isPersistent});
+
+  final bool isPersistent;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       container: true,
-      label: 'Prototype data, not live operations',
+      label: isPersistent
+          ? 'Authenticated shared deployment data'
+          : 'Prototype data, not live operations',
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: AppColors.developmentContainer,
           borderRadius: AppRadius.medium,
           border: Border.all(color: AppColors.developmentBorder),
         ),
-        child: const Padding(
-          padding: EdgeInsets.all(AppSpacing.sm),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.sm),
           child: Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.science_outlined,
                 color: AppColors.onDevelopmentContainer,
               ),
-              SizedBox(width: AppSpacing.sm),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
-                  'Prototype data — not live operations',
-                  style: TextStyle(
+                  isPersistent
+                      ? 'Authenticated shared deployment data'
+                      : 'Prototype data — not live operations',
+                  style: const TextStyle(
                     color: AppColors.onDevelopmentContainer,
                     fontWeight: FontWeight.w700,
                   ),

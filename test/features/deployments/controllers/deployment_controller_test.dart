@@ -9,6 +9,16 @@ import 'package:prasa_assist/features/deployments/repositories/in_memory_deploym
 
 void main() {
   group('DeploymentController', () {
+    test('exposes repository capabilities without changing its contract', () {
+      final controller = DeploymentController(
+        repository: InMemoryDeploymentRepository(),
+      );
+
+      expect(controller.capabilities.isPersistent, isFalse);
+      expect(controller.capabilities.supportsPhysicalDelete, isTrue);
+      expect(controller.capabilities.supportsReset, isTrue);
+    });
+
     test('exposes loading state and an immutable loaded list', () async {
       final repository = _DelayedRepository();
       final controller = DeploymentController(repository: repository);

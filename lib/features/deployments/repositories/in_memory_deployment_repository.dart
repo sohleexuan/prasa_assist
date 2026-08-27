@@ -2,11 +2,13 @@ import '../models/deployment_status.dart';
 import '../models/service_deployment.dart';
 import 'deployment_data_exception.dart';
 import 'deployment_repository.dart';
+import 'deployment_repository_capabilities.dart';
 
 /// In-memory storage for development and demonstration only.
 ///
 /// This repository is not a live data source and does not connect to Supabase.
-class InMemoryDeploymentRepository implements DeploymentRepository {
+class InMemoryDeploymentRepository
+    implements DeploymentRepository, DeploymentRepositoryCapabilitiesProvider {
   InMemoryDeploymentRepository({
     Iterable<ServiceDeployment> seedData = const [],
   }) {
@@ -27,6 +29,10 @@ class InMemoryDeploymentRepository implements DeploymentRepository {
   }
 
   final Map<String, ServiceDeployment> _deployments = {};
+
+  @override
+  DeploymentRepositoryCapabilities get capabilities =>
+      const DeploymentRepositoryCapabilities.prototype();
 
   /// Mock data only; the identifiers and operational details are demonstrative.
   static ServiceDeployment get demonstrationDeployment => ServiceDeployment(

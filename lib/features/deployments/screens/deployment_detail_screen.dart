@@ -140,7 +140,9 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const _PrototypeNotice(),
+          _PrototypeNotice(
+            isPersistent: widget.controller.capabilities.isPersistent,
+          ),
           if (_isSubmitting) ...[
             const SizedBox(height: AppSpacing.sm),
             const LinearProgressIndicator(
@@ -309,7 +311,9 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
           ),
         );
         addAction(_cancelButton());
-        addAction(_deleteButton());
+        if (widget.controller.capabilities.supportsPhysicalDelete) {
+          addAction(_deleteButton());
+        }
       case DeploymentStatus.scheduled:
         addAction(
           FilledButton.icon(
@@ -359,7 +363,9 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
             background: AppColors.errorContainer,
           ),
         );
-        addAction(_deleteButton());
+        if (widget.controller.capabilities.supportsPhysicalDelete) {
+          addAction(_deleteButton());
+        }
     }
 
     return _DetailSection(
@@ -717,32 +723,38 @@ class _VehicleItem extends StatelessWidget {
 }
 
 class _PrototypeNotice extends StatelessWidget {
-  const _PrototypeNotice();
+  const _PrototypeNotice({required this.isPersistent});
+
+  final bool isPersistent;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       container: true,
-      label: 'Prototype data, not live operations',
+      label: isPersistent
+          ? 'Authenticated shared deployment data'
+          : 'Prototype data, not live operations',
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: AppColors.developmentContainer,
           borderRadius: AppRadius.medium,
           border: Border.all(color: AppColors.developmentBorder),
         ),
-        child: const Padding(
-          padding: EdgeInsets.all(AppSpacing.sm),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.sm),
           child: Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.science_outlined,
                 color: AppColors.onDevelopmentContainer,
               ),
-              SizedBox(width: AppSpacing.sm),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
-                  'Prototype data — not live operations',
-                  style: TextStyle(
+                  isPersistent
+                      ? 'Authenticated shared deployment data'
+                      : 'Prototype data — not live operations',
+                  style: const TextStyle(
                     color: AppColors.onDevelopmentContainer,
                     fontWeight: FontWeight.w700,
                   ),

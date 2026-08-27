@@ -4,6 +4,7 @@ import '../models/deployment_status.dart';
 import '../models/service_deployment.dart';
 import '../repositories/deployment_data_exception.dart';
 import '../repositories/deployment_repository.dart';
+import '../repositories/deployment_repository_capabilities.dart';
 
 class DeploymentController extends ChangeNotifier {
   factory DeploymentController({
@@ -31,6 +32,9 @@ class DeploymentController extends ChangeNotifier {
   bool get isLoading => _isLoading;
 
   String? get errorMessage => _errorMessage;
+
+  DeploymentRepositoryCapabilities get capabilities =>
+      deploymentCapabilitiesOf(_repository);
 
   Future<void> loadDeployments() async {
     _beginOperation();
