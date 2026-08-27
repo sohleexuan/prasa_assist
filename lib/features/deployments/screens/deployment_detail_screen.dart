@@ -10,6 +10,7 @@ import '../../../shared/widgets/app_section_card.dart';
 import '../controllers/deployment_controller.dart';
 import '../models/deployment_status.dart';
 import '../models/service_deployment.dart';
+import '../utils/deployment_date_time_formatter.dart';
 import '../widgets/deployment_status_chip.dart';
 import '../widgets/deployment_workflow_indicator.dart';
 
@@ -210,11 +211,11 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
               children: [
                 _DetailItem(
                   label: 'Start',
-                  value: _formatDateTime(deployment.startTime),
+                  value: formatDeploymentLocalDateTime(deployment.startTime),
                 ),
                 _DetailItem(
                   label: 'End',
-                  value: _formatDateTime(deployment.endTime),
+                  value: formatDeploymentLocalDateTime(deployment.endTime),
                 ),
               ],
             ),
@@ -258,11 +259,11 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
                 _DetailItem(label: 'Created by', value: deployment.createdBy),
                 _DetailItem(
                   label: 'Created at',
-                  value: _formatDateTime(deployment.createdAt),
+                  value: formatDeploymentLocalDateTime(deployment.createdAt),
                 ),
                 _DetailItem(
                   label: 'Last updated at',
-                  value: _formatDateTime(deployment.updatedAt),
+                  value: formatDeploymentLocalDateTime(deployment.updatedAt),
                 ),
               ],
             ),
@@ -621,14 +622,6 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
       'Draft is not an operational action from this screen.',
     ),
   };
-
-  String _formatDateTime(DateTime dateTime) {
-    return '${dateTime.year.toString().padLeft(4, '0')}-'
-        '${dateTime.month.toString().padLeft(2, '0')}-'
-        '${dateTime.day.toString().padLeft(2, '0')} '
-        '${dateTime.hour.toString().padLeft(2, '0')}:'
-        '${dateTime.minute.toString().padLeft(2, '0')}';
-  }
 }
 
 class _StatusConfirmationContent {

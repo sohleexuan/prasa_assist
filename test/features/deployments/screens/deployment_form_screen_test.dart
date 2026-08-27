@@ -375,6 +375,30 @@ void main() {
       expect(savedDeployment, stored);
     });
 
+    testWidgets('UTC edit values round-trip without shifting their instants', (
+      tester,
+    ) async {
+      final start = DateTime.utc(2026, 8, 27, 20, 40);
+      final end = DateTime.utc(2026, 8, 27, 21, 40);
+      final existing = _existingDeployment(startTime: start, endTime: end);
+      final harness = await _pumpForm(tester, existingDeployment: existing);
+
+      if (_localDate(start) == _localDate(end)) {
+        expect(find.text(_localDate(start)), findsNWidgets(2));
+      } else {
+        expect(find.text(_localDate(start)), findsOneWidget);
+        expect(find.text(_localDate(end)), findsOneWidget);
+      }
+      expect(find.text(_localTime(start)), findsOneWidget);
+      expect(find.text(_localTime(end)), findsOneWidget);
+
+      await _submit(tester, 'save-changes-button');
+
+      final stored = await harness.repository.getById(existing.deploymentId);
+      expect(stored!.startTime.isAtSameMomentAs(start), isTrue);
+      expect(stored.endTime.isAtSameMomentAs(end), isTrue);
+    });
+
     testWidgets('Draft can be scheduled only through the explicit action', (
       tester,
     ) async {
@@ -722,14 +746,16 @@ ServiceDeployment _existingDeployment({
   String routeName = 'Route 300',
   List<String> vehicleIds = const ['ABC 1230', 'DEF 4567'],
   String purpose = 'Replace unavailable Bus B1023 during peak hour',
+  DateTime? startTime,
+  DateTime? endTime,
 }) {
   return ServiceDeployment(
     deploymentId: 'DEP-120',
     routeId: '300',
     routeName: routeName,
     vehicleIds: vehicleIds,
-    startTime: DateTime(2026, 8, 27, 9),
-    endTime: DateTime(2026, 8, 27, 11),
+    startTime: startTime ?? DateTime(2026, 8, 27, 9),
+    endTime: endTime ?? DateTime(2026, 8, 27, 11),
     status: status,
     purpose: purpose,
     createdBy: 'original-staff',
@@ -738,4 +764,17 @@ ServiceDeployment _existingDeployment({
     incidentId: 'INC-2026-0142',
     sourceRecommendationId: 'REC-0088',
   );
+}
+
+String _localDate(DateTime value) {
+  final local = value.toLocal();
+  return '${local.year.toString().padLeft(4, '0')}-'
+      '${local.month.toString().padLeft(2, '0')}-'
+      '${local.day.toString().padLeft(2, '0')}';
+}
+
+String _localTime(DateTime value) {
+  final local = value.toLocal();
+  return '${local.hour.toString().padLeft(2, '0')}:'
+      '${local.minute.toString().padLeft(2, '0')}';
 }

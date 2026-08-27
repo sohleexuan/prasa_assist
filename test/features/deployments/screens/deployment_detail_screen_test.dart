@@ -94,6 +94,31 @@ void main() {
     expect(find.text('2026-08-27 07:45'), findsOneWidget);
   });
 
+  testWidgets('uses device-local time for service and audit timestamps', (
+    tester,
+  ) async {
+    final start = DateTime.utc(2026, 8, 27, 20, 40);
+    final end = DateTime.utc(2026, 8, 27, 21, 40);
+    final created = DateTime.utc(2026, 8, 27, 19, 15);
+    final updated = DateTime.utc(2026, 8, 27, 19, 30);
+    await _pumpDetail(
+      tester,
+      deployments: [
+        _deployment(
+          startTime: start,
+          endTime: end,
+          createdAt: created,
+          updatedAt: updated,
+        ),
+      ],
+    );
+
+    expect(find.text(_localText(start)), findsOneWidget);
+    expect(find.text(_localText(end)), findsOneWidget);
+    expect(find.text(_localText(created)), findsOneWidget);
+    expect(find.text(_localText(updated)), findsOneWidget);
+  });
+
   testWidgets('shows optional Incident and Recommendation links when present', (
     tester,
   ) async {
@@ -658,19 +683,23 @@ ServiceDeployment _deployment({
   String createdBy = 'Operations Tester',
   Object? incidentId = _notProvided,
   Object? sourceRecommendationId = _notProvided,
+  DateTime? startTime,
+  DateTime? endTime,
+  DateTime? createdAt,
+  DateTime? updatedAt,
 }) {
   return ServiceDeployment(
     deploymentId: deploymentId,
     routeId: routeId,
     routeName: routeName,
     vehicleIds: vehicleIds,
-    startTime: DateTime(2026, 8, 27, 8, 5),
-    endTime: DateTime(2026, 8, 27, 10, 35),
+    startTime: startTime ?? DateTime(2026, 8, 27, 8, 5),
+    endTime: endTime ?? DateTime(2026, 8, 27, 10, 35),
     status: status,
     purpose: purpose,
     createdBy: createdBy,
-    createdAt: DateTime(2026, 8, 26, 14, 15),
-    updatedAt: DateTime(2026, 8, 27, 7, 45),
+    createdAt: createdAt ?? DateTime(2026, 8, 26, 14, 15),
+    updatedAt: updatedAt ?? DateTime(2026, 8, 27, 7, 45),
     incidentId: identical(incidentId, _notProvided)
         ? 'INC-2026-0142'
         : incidentId as String?,
@@ -678,6 +707,15 @@ ServiceDeployment _deployment({
         ? 'REC-0088'
         : sourceRecommendationId as String?,
   );
+}
+
+String _localText(DateTime value) {
+  final local = value.toLocal();
+  return '${local.year.toString().padLeft(4, '0')}-'
+      '${local.month.toString().padLeft(2, '0')}-'
+      '${local.day.toString().padLeft(2, '0')} '
+      '${local.hour.toString().padLeft(2, '0')}:'
+      '${local.minute.toString().padLeft(2, '0')}';
 }
 
 Future<DeploymentController> _pumpDetail(

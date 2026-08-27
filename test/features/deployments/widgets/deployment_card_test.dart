@@ -36,6 +36,20 @@ void main() {
     expect(find.text('1 vehicles'), findsNothing);
   });
 
+  testWidgets('formats a UTC service window in device-local time', (
+    tester,
+  ) async {
+    final start = DateTime.utc(2026, 8, 27, 20, 40);
+    final end = DateTime.utc(2026, 8, 27, 21, 40);
+
+    await _pumpCard(tester, _deployment(startTime: start, endTime: end));
+
+    expect(
+      find.text('${_localText(start)} to ${_localText(end)}'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('omits optional integration IDs when absent', (tester) async {
     await _pumpCard(
       tester,
@@ -110,14 +124,16 @@ ServiceDeployment _deployment({
   String purpose = 'Replace unavailable Bus B1023 during peak hour',
   String? incidentId = 'INC-2026-0142',
   String? sourceRecommendationId = 'REC-0088',
+  DateTime? startTime,
+  DateTime? endTime,
 }) {
   return ServiceDeployment(
     deploymentId: 'DEP-120',
     routeId: '300',
     routeName: routeName,
     vehicleIds: vehicleIds,
-    startTime: DateTime(2026, 8, 27, 8),
-    endTime: DateTime(2026, 8, 27, 10),
+    startTime: startTime ?? DateTime(2026, 8, 27, 8),
+    endTime: endTime ?? DateTime(2026, 8, 27, 10),
     status: DeploymentStatus.scheduled,
     purpose: purpose,
     createdBy: 'Demo Operations Staff',
@@ -126,4 +142,13 @@ ServiceDeployment _deployment({
     incidentId: incidentId,
     sourceRecommendationId: sourceRecommendationId,
   );
+}
+
+String _localText(DateTime value) {
+  final local = value.toLocal();
+  return '${local.year.toString().padLeft(4, '0')}-'
+      '${local.month.toString().padLeft(2, '0')}-'
+      '${local.day.toString().padLeft(2, '0')} '
+      '${local.hour.toString().padLeft(2, '0')}:'
+      '${local.minute.toString().padLeft(2, '0')}';
 }

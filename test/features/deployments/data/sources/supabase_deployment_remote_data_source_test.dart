@@ -110,6 +110,23 @@ void main() {
       },
     );
 
+    test('update preserves local service-window instants as UTC', () async {
+      final start = DateTime.parse('2026-08-28T04:40:00+08:00');
+      final end = DateTime.parse('2026-08-28T05:40:00+08:00');
+      final gateway = _FakeGateway()
+        ..rpcResponse = _rpcResponse(version: 6, deploymentCode: 'DEP-120');
+      final source = SupabaseDeploymentRemoteDataSource.withGateway(gateway);
+
+      await source.update(
+        _record(version: 5, startTime: start, endTime: end),
+        expectedVersion: 5,
+      );
+
+      final payload = gateway.rpcParams['p_payload'] as Map<String, dynamic>;
+      expect(payload['start_time'], '2026-08-27T20:40:00.000Z');
+      expect(payload['end_time'], '2026-08-27T21:40:00.000Z');
+    });
+
     test('transition ignores all server-owned neutral inputs', () async {
       final gateway = _FakeGateway()
         ..rpcResponse = _rpcResponse(
@@ -211,14 +228,19 @@ void main() {
 const _storageId = '00000000-0000-0000-0000-000000000120';
 const _actorId = '00000000-0000-0000-0000-000000000001';
 
-DeploymentRecordDto _record({int version = 1, String status = 'draft'}) {
+DeploymentRecordDto _record({
+  int version = 1,
+  String status = 'draft',
+  DateTime? startTime,
+  DateTime? endTime,
+}) {
   return DeploymentRecordDto(
     deploymentCode: 'DEP-CLIENT-PROVISIONAL',
     routeId: '300',
     routeName: 'Route 300',
     vehicleIds: const ['REPLACEMENT-BUS-01', 'REPLACEMENT-BUS-02'],
-    startTime: DateTime.utc(2026, 8, 28),
-    endTime: DateTime.utc(2026, 8, 28, 1),
+    startTime: startTime ?? DateTime.utc(2026, 8, 28),
+    endTime: endTime ?? DateTime.utc(2026, 8, 28, 1),
     status: status,
     purpose: 'Replace unavailable Bus B1023',
     createdByLabel: 'staff@example.com',

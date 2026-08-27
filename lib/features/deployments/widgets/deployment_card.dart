@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../models/service_deployment.dart';
+import '../utils/deployment_date_time_formatter.dart';
 import 'deployment_status_chip.dart';
 
 class DeploymentCard extends StatelessWidget {
@@ -75,8 +76,9 @@ class DeploymentCard extends StatelessWidget {
                   icon: Icons.schedule_outlined,
                   label: 'Service window',
                   value:
-                      '${_formatDateTime(deployment.startTime)} to '
-                      '${_formatDateTime(deployment.endTime)}',
+                      '${formatDeploymentLocalDateTime(deployment.startTime)} '
+                      'to '
+                      '${formatDeploymentLocalDateTime(deployment.endTime)}',
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 _DetailRow(
@@ -117,14 +119,6 @@ class DeploymentCard extends StatelessWidget {
 
   String _vehicleCountLabel(int count) {
     return '$count ${count == 1 ? 'vehicle' : 'vehicles'}';
-  }
-
-  String _formatDateTime(DateTime dateTime) {
-    return '${dateTime.year.toString().padLeft(4, '0')}-'
-        '${dateTime.month.toString().padLeft(2, '0')}-'
-        '${dateTime.day.toString().padLeft(2, '0')} '
-        '${dateTime.hour.toString().padLeft(2, '0')}:'
-        '${dateTime.minute.toString().padLeft(2, '0')}';
   }
 }
 

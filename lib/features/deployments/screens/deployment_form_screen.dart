@@ -9,6 +9,7 @@ import '../controllers/deployment_controller.dart';
 import '../models/deployment_prefill.dart';
 import '../models/deployment_status.dart';
 import '../models/service_deployment.dart';
+import '../utils/deployment_date_time_formatter.dart';
 import '../widgets/deployment_status_chip.dart';
 
 class DeploymentFormScreen extends StatefulWidget {
@@ -73,7 +74,7 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
   @override
   void initState() {
     super.initState();
-    final now = _now;
+    final now = _now.toLocal();
     final existing = widget.existingDeployment;
     final prefill = existing == null ? widget.prefill : null;
     final generatedId =
@@ -102,10 +103,10 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
       text: existing?.sourceRecommendationId ?? prefill?.recommendationId ?? '',
     );
     _startTime =
-        existing?.startTime ?? prefill?.suggestedStartTime ?? _toMinute(now);
+        (existing?.startTime ?? prefill?.suggestedStartTime)?.toLocal() ??
+        _toMinute(now);
     _endTime =
-        existing?.endTime ??
-        prefill?.suggestedEndTime ??
+        (existing?.endTime ?? prefill?.suggestedEndTime)?.toLocal() ??
         _startTime.add(const Duration(hours: 1));
   }
 
@@ -691,7 +692,7 @@ class _DateTimeControls extends StatelessWidget {
             key: ValueKey('$prefix-date-button'),
             onPressed: enabled ? onPickDate : null,
             icon: const Icon(Icons.calendar_today_outlined),
-            label: Text(_formatDate(value)),
+            label: Text(formatDeploymentLocalDate(value)),
             style: OutlinedButton.styleFrom(alignment: Alignment.centerLeft),
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -699,23 +700,12 @@ class _DateTimeControls extends StatelessWidget {
             key: ValueKey('$prefix-time-button'),
             onPressed: enabled ? onPickTime : null,
             icon: const Icon(Icons.access_time),
-            label: Text(_formatTime(value)),
+            label: Text(formatDeploymentLocalTime(value)),
             style: OutlinedButton.styleFrom(alignment: Alignment.centerLeft),
           ),
         ],
       ),
     );
-  }
-
-  String _formatDate(DateTime dateTime) {
-    return '${dateTime.year.toString().padLeft(4, '0')}-'
-        '${dateTime.month.toString().padLeft(2, '0')}-'
-        '${dateTime.day.toString().padLeft(2, '0')}';
-  }
-
-  String _formatTime(DateTime dateTime) {
-    return '${dateTime.hour.toString().padLeft(2, '0')}:'
-        '${dateTime.minute.toString().padLeft(2, '0')}';
   }
 }
 
