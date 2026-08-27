@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/dependencies/app_dependencies_scope.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
@@ -8,8 +9,44 @@ import '../shared/widgets/app_section_card.dart';
 import '../shared/widgets/app_status_chip.dart';
 import 'module_registry.dart';
 
-class PrasaAssistHomePage extends StatelessWidget {
+class PrasaAssistHomePage extends StatefulWidget {
   const PrasaAssistHomePage({super.key});
+
+  @override
+  State<PrasaAssistHomePage> createState() => _PrasaAssistHomePageState();
+}
+
+class _PrasaAssistHomePageState extends State<PrasaAssistHomePage> {
+  static const _safeSignOutFailureMessage =
+      'Unable to sign out. Check the connection and try again.';
+
+  var _isSigningOut = false;
+
+  Future<void> _signOut() async {
+    if (_isSigningOut) {
+      return;
+    }
+
+    setState(() => _isSigningOut = true);
+
+    try {
+      final authGateway = AppDependenciesScope.of(context).authGateway;
+      await authGateway.signOut();
+    } on Object {
+      if (mounted) {
+        final messenger = ScaffoldMessenger.of(context);
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(content: Text(_safeSignOutFailureMessage)),
+          );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSigningOut = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,6 +54,19 @@ class PrasaAssistHomePage extends StatelessWidget {
 
     return AppPageScaffold(
       title: 'PrasaAssist',
+      actions: [
+        IconButton(
+          key: const Key('staff-sign-out-button'),
+          tooltip: 'Sign out',
+          onPressed: _isSigningOut ? null : _signOut,
+          icon: _isSigningOut
+              ? const SizedBox.square(
+                  dimension: AppSpacing.lg,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.logout_rounded),
+        ),
+      ],
       body: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(

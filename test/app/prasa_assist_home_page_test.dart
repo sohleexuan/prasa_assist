@@ -1,6 +1,10 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prasa_assist/app/prasa_assist_app.dart';
+import 'package:prasa_assist/core/auth/auth_gateway.dart';
+
+import '../support/fake_auth_gateway.dart';
+import '../support/test_dependencies.dart';
 
 void main() {
   const moduleNames = [
@@ -13,7 +17,7 @@ void main() {
   testWidgets('home page renders foundation messaging and four modules', (
     tester,
   ) async {
-    await tester.pumpWidget(const PrasaAssistApp());
+    await _pumpAuthenticatedApp(tester);
 
     expect(find.text('Development foundation'), findsOneWidget);
     expect(find.text('AI recommends. Staff decides.'), findsOneWidget);
@@ -33,7 +37,7 @@ void main() {
     testWidgets('navigates from $moduleName to its placeholder', (
       tester,
     ) async {
-      await tester.pumpWidget(const PrasaAssistApp());
+      await _pumpAuthenticatedApp(tester);
 
       final moduleEntry = find.text(moduleName);
       await tester.scrollUntilVisible(
@@ -62,7 +66,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const PrasaAssistApp());
+    await _pumpAuthenticatedApp(tester);
     await tester.pump();
 
     expect(tester.takeException(), isNull);
@@ -76,4 +80,15 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('AI Recommendations'), findsOneWidget);
   });
+}
+
+Future<void> _pumpAuthenticatedApp(WidgetTester tester) async {
+  final gateway = FakeAuthGateway(
+    initialSession: const AuthSession(userId: 'staff-1'),
+  );
+  addTearDown(gateway.dispose);
+  await tester.pumpWidget(
+    PrasaAssistApp(dependencies: createTestDependencies(gateway)),
+  );
+  await tester.pump();
 }
