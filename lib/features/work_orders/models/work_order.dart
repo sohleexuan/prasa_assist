@@ -104,4 +104,19 @@ extension WorkOrderStatusLabel on WorkOrderStatus {
     WorkOrderStatus.completed => 'Completed',
     WorkOrderStatus.cancelled => 'Cancelled',
   };
+
+  bool get isTerminal =>
+      this == WorkOrderStatus.completed || this == WorkOrderStatus.cancelled;
+
+  bool canTransitionTo(WorkOrderStatus next) {
+    if (isTerminal || next == this) return false;
+    if (next == WorkOrderStatus.cancelled) return true;
+    return switch (this) {
+      WorkOrderStatus.draft => next == WorkOrderStatus.open,
+      WorkOrderStatus.open => next == WorkOrderStatus.assigned,
+      WorkOrderStatus.assigned => next == WorkOrderStatus.inProgress,
+      WorkOrderStatus.inProgress => next == WorkOrderStatus.completed,
+      WorkOrderStatus.completed || WorkOrderStatus.cancelled => false,
+    };
+  }
 }

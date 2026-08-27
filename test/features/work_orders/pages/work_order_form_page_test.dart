@@ -96,6 +96,35 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('defensively blocks editing a terminal record', (tester) async {
+    final now = DateTime(2026, 8, 27);
+    final completed = WorkOrder(
+      workOrderId: 'WO-1',
+      vehicleId: 'B1023',
+      taskType: 'Inspection',
+      description: 'Completed inspection',
+      priority: WorkOrderPriority.high,
+      status: WorkOrderStatus.completed,
+      createdBy: 'Staff A',
+      createdAt: now,
+      updatedAt: now,
+      completedAt: now,
+    );
+    final controller = WorkOrdersController(
+      InMemoryWorkOrderRepository(initialWorkOrders: [completed]),
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      _TestHost(
+        child: WorkOrderFormPage(controller: controller, workOrder: completed),
+      ),
+    );
+
+    expect(find.text('Editing unavailable'), findsOneWidget);
+    expect(find.byKey(const Key('saveWorkOrderButton')), findsNothing);
+  });
 }
 
 Future<void> _scrollToBottom(WidgetTester tester) async {

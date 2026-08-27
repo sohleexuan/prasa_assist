@@ -68,4 +68,37 @@ void main() {
     expect(record(WorkOrderStatus.completed).isTerminal, isTrue);
     expect(record(WorkOrderStatus.cancelled).isTerminal, isTrue);
   });
+
+  test('allows only the approved status workflow', () {
+    expect(WorkOrderStatus.draft.canTransitionTo(WorkOrderStatus.open), isTrue);
+    expect(
+      WorkOrderStatus.open.canTransitionTo(WorkOrderStatus.assigned),
+      isTrue,
+    );
+    expect(
+      WorkOrderStatus.assigned.canTransitionTo(WorkOrderStatus.inProgress),
+      isTrue,
+    );
+    expect(
+      WorkOrderStatus.inProgress.canTransitionTo(WorkOrderStatus.completed),
+      isTrue,
+    );
+    for (final status in WorkOrderStatus.values.where(
+      (status) => !status.isTerminal,
+    )) {
+      expect(status.canTransitionTo(WorkOrderStatus.cancelled), isTrue);
+    }
+    expect(
+      WorkOrderStatus.draft.canTransitionTo(WorkOrderStatus.assigned),
+      isFalse,
+    );
+    expect(
+      WorkOrderStatus.completed.canTransitionTo(WorkOrderStatus.cancelled),
+      isFalse,
+    );
+    expect(
+      WorkOrderStatus.cancelled.canTransitionTo(WorkOrderStatus.open),
+      isFalse,
+    );
+  });
 }

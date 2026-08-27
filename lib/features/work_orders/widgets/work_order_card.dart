@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/app_section_card.dart';
 import '../models/work_order.dart';
+import 'work_order_priority_chip.dart';
 import 'work_order_status_chip.dart';
 
 class WorkOrderCard extends StatelessWidget {
@@ -29,7 +30,7 @@ class WorkOrderCard extends StatelessWidget {
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           WorkOrderStatusChip(status: workOrder.status),
-          Chip(label: Text(workOrder.priority.label)),
+          WorkOrderPriorityChip(priority: workOrder.priority),
           Text(
             workOrder.workOrderId,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(

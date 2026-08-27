@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:prasa_assist/core/theme/app_theme.dart';
 import 'package:prasa_assist/features/work_orders/controllers/work_orders_controller.dart';
 import 'package:prasa_assist/features/work_orders/data/in_memory_work_order_repository.dart';
+import 'package:prasa_assist/features/work_orders/models/work_order.dart';
 import 'package:prasa_assist/features/work_orders/pages/work_order_list_page.dart';
 
 void main() {
@@ -61,6 +62,97 @@ void main() {
 
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('searches approved fields and clears no-match results', (
+    tester,
+  ) async {
+    final controller = _controllerWithTwoRecords();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      _TestHost(child: WorkOrderListPage(controller: controller)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('workOrderSearchField')),
+      'aina',
+    );
+    await tester.pump();
+    expect(find.text('B2040 · Brake repair'), findsOneWidget);
+    expect(find.text('B1023 · Vehicle inspection'), findsNothing);
+
+    await tester.enterText(
+      find.byKey(const Key('workOrderSearchField')),
+      'no match',
+    );
+    await tester.pump();
+    expect(find.text('No matching work orders'), findsOneWidget);
+    await tester.tap(find.text('Clear filters'));
+    await tester.pump();
+    expect(find.text('B1023 · Vehicle inspection'), findsOneWidget);
+    expect(find.text('B2040 · Brake repair'), findsOneWidget);
+  });
+
+  testWidgets('filters local records by status', (tester) async {
+    final controller = _controllerWithTwoRecords();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      _TestHost(child: WorkOrderListPage(controller: controller)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(DropdownButtonFormField<WorkOrderStatus?>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Assigned').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('B2040 · Brake repair'), findsOneWidget);
+    expect(find.text('B1023 · Vehicle inspection'), findsNothing);
+  });
+}
+
+WorkOrdersController _controllerWithTwoRecords() {
+  final now = DateTime(2026, 8, 27, 9);
+  WorkOrder record({
+    required String id,
+    required String vehicle,
+    required String task,
+    required String description,
+    required WorkOrderStatus status,
+    String? assignedTo,
+  }) => WorkOrder(
+    workOrderId: id,
+    vehicleId: vehicle,
+    taskType: task,
+    description: description,
+    priority: WorkOrderPriority.high,
+    assignedTo: assignedTo,
+    status: status,
+    createdBy: 'Staff A',
+    createdAt: now,
+    updatedAt: now,
+  );
+  return WorkOrdersController(
+    InMemoryWorkOrderRepository(
+      initialWorkOrders: [
+        record(
+          id: 'WO-1',
+          vehicle: 'B1023',
+          task: 'Vehicle inspection',
+          description: 'Inspect Route 300 breakdown',
+          status: WorkOrderStatus.draft,
+        ),
+        record(
+          id: 'WO-2',
+          vehicle: 'B2040',
+          task: 'Brake repair',
+          description: 'Repair brake pads',
+          status: WorkOrderStatus.assigned,
+          assignedTo: 'Aina Rahman',
+        ),
+      ],
+    ),
+  );
 }
 
 class _TestHost extends StatelessWidget {

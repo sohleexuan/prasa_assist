@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_spacing.dart';
+import '../../../shared/widgets/app_error_state.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
 import '../controllers/work_orders_controller.dart';
 import '../models/work_order.dart';
@@ -57,6 +58,15 @@ class _WorkOrderFormPageState extends State<WorkOrderFormPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.workOrder?.isTerminal ?? false) {
+      return const AppPageScaffold(
+        title: 'Edit work order',
+        body: AppErrorState(
+          title: 'Editing unavailable',
+          message: 'Completed and cancelled work orders cannot be edited.',
+        ),
+      );
+    }
     return AppPageScaffold(
       title: _isEditing ? 'Edit work order' : 'Create work order',
       body: Align(
