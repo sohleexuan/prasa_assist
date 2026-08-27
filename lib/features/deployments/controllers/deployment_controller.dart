@@ -83,8 +83,9 @@ class DeploymentController extends ChangeNotifier {
 
   Future<bool> changeStatus(
     String deploymentId,
-    DeploymentStatus nextStatus,
-  ) async {
+    DeploymentStatus nextStatus, {
+    DateTime? updatedAt,
+  }) async {
     return _runMutation(() async {
       final deployment = await _repository.getById(deploymentId);
       if (deployment == null) {
@@ -99,7 +100,7 @@ class DeploymentController extends ChangeNotifier {
 
       final updatedDeployment = deployment.copyWith(
         status: nextStatus,
-        updatedAt: _clock(),
+        updatedAt: updatedAt ?? _clock(),
       );
       await _repository.update(updatedDeployment);
       _selectedDeployment = updatedDeployment;
