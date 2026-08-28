@@ -6,22 +6,30 @@ import '../../../shared/widgets/app_error_state.dart';
 import '../../../shared/widgets/app_loading_indicator.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
 import '../controllers/deployment_controller.dart';
+import '../data/dto/local_deployment_record.dart';
 import '../models/deployment_status.dart';
 import '../models/service_deployment.dart';
 import '../widgets/deployment_card.dart';
 import '../widgets/deployment_data_notice.dart';
+import '../widgets/local_deployment_work_card.dart';
 
 class DeploymentListScreen extends StatefulWidget {
   const DeploymentListScreen({
     required this.controller,
     this.onCreateDeployment,
     this.onOpenDeployment,
+    this.onEditLocalWork,
+    this.onPublishLocalWork,
+    this.onDiscardLocalWork,
     super.key,
   });
 
   final DeploymentController controller;
   final VoidCallback? onCreateDeployment;
   final ValueChanged<ServiceDeployment>? onOpenDeployment;
+  final ValueChanged<LocalDeploymentRecord>? onEditLocalWork;
+  final ValueChanged<LocalDeploymentRecord>? onPublishLocalWork;
+  final ValueChanged<LocalDeploymentRecord>? onDiscardLocalWork;
 
   @override
   State<DeploymentListScreen> createState() => _DeploymentListScreenState();
@@ -80,12 +88,14 @@ class _DeploymentListScreenState extends State<DeploymentListScreen> {
   }
 
   Widget _buildBody() {
-    if (widget.controller.isLoading) {
+    if (widget.controller.isLoading &&
+        widget.controller.deployments.isEmpty &&
+        widget.controller.localWorkItems.isEmpty) {
       return const AppLoadingIndicator(message: 'Loading service deployments');
     }
 
     final errorMessage = widget.controller.errorMessage;
-    if (errorMessage != null) {
+    if (errorMessage != null && widget.controller.localWorkItems.isEmpty) {
       return AppErrorState(
         title: 'Unable to load deployments',
         message: errorMessage,
@@ -116,7 +126,19 @@ class _DeploymentListScreenState extends State<DeploymentListScreen> {
               children: [
                 DeploymentDataNotice(
                   isPersistent: widget.controller.capabilities.isPersistent,
+                  provenance: widget.controller.listProvenance,
                 ),
+                if (errorMessage != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  _InlineLoadError(
+                    message: errorMessage,
+                    onRetry: widget.controller.loadDeployments,
+                  ),
+                ],
+                if (widget.controller.localWorkItems.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  _buildLocalWorkSection(),
+                ],
                 const SizedBox(height: AppSpacing.md),
                 _DeploymentSummary(
                   totalCount: deployments.length,
@@ -155,7 +177,19 @@ class _DeploymentListScreenState extends State<DeploymentListScreen> {
             children: [
               DeploymentDataNotice(
                 isPersistent: widget.controller.capabilities.isPersistent,
+                provenance: widget.controller.listProvenance,
               ),
+              if (errorMessage != null) ...[
+                const SizedBox(height: AppSpacing.sm),
+                _InlineLoadError(
+                  message: errorMessage,
+                  onRetry: widget.controller.loadDeployments,
+                ),
+              ],
+              if (widget.controller.localWorkItems.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                _buildLocalWorkSection(),
+              ],
               const SizedBox(height: AppSpacing.md),
               _DeploymentSummary(
                 totalCount: deployments.length,
@@ -233,6 +267,43 @@ class _DeploymentListScreenState extends State<DeploymentListScreen> {
     );
   }
 
+  Widget _buildLocalWorkSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Unpublished local work',
+          style: Theme.of(context).textTheme.titleMedium
+              ?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        const Text(
+          'Stored only on this device until Supabase confirms publication.',
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        for (final record in widget.controller.localWorkItems) ...[
+          LocalDeploymentWorkCard(
+            key: ValueKey('local-work-${record.localId}'),
+            record: record,
+            isPublishing: widget.controller.isPublishingLocalDraft(
+              record.localId,
+            ),
+            onEdit: widget.onEditLocalWork == null
+                ? null
+                : () => widget.onEditLocalWork!(record),
+            onPublish: widget.onPublishLocalWork == null
+                ? null
+                : () => widget.onPublishLocalWork!(record),
+            onDiscard: widget.onDiscardLocalWork == null
+                ? null
+                : () => widget.onDiscardLocalWork!(record),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+      ],
+    );
+  }
+
   bool get _filtersAreActive =>
       _searchController.text.trim().isNotEmpty || _selectedStatus != null;
 
@@ -272,6 +343,34 @@ class _DeploymentListScreenState extends State<DeploymentListScreen> {
     setState(() {
       _selectedStatus = null;
     });
+  }
+}
+
+class _InlineLoadError extends StatelessWidget {
+  const _InlineLoadError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.cloud_off_outlined,
+              color: Theme.of(context).colorScheme.error,
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(child: Text(message)),
+            TextButton(onPressed: onRetry, child: const Text('Retry')),
+          ],
+        ),
+      ),
+    );
   }
 }
 

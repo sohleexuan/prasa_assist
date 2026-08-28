@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../core/dependencies/app_dependencies_scope.dart';
+import '../core/database/local_user_scope.dart';
+import '../features/deployments/data/sources/sqlite_deployment_local_data_source.dart';
 import '../features/deployments/data/sources/supabase_deployment_remote_data_source.dart';
-import '../features/deployments/repositories/persistent_deployment_repository.dart';
+import '../features/deployments/repositories/hybrid_deployment_repository.dart';
 import '../features/deployments/service_deployment_page.dart';
 import 'module_placeholder_page.dart';
 
@@ -75,10 +77,31 @@ abstract final class ModuleRegistry {
     }
     final email = session.email?.trim();
     final actorIdentifier = email?.isNotEmpty == true ? email! : session.userId;
+    late final LocalUserScope userScope;
+    try {
+      userScope = LocalUserScope(session.userId);
+    } on ArgumentError {
+      throw StateError(
+        'A valid authenticated staff identity is required to open deployments.',
+      );
+    }
+    final remoteDataSource = SupabaseDeploymentRemoteDataSource(
+      dependencies.supabaseClient,
+    );
+    var localIdSequence = 0;
     return ServiceDeploymentPage(
-      repository: PersistentDeploymentRepository(
-        dataSource: SupabaseDeploymentRemoteDataSource(
-          dependencies.supabaseClient,
+      repository: HybridDeploymentRepository(
+        remoteDataSource: remoteDataSource,
+        draftPublisher: remoteDataSource,
+        localDataSource: SqliteDeploymentLocalDataSource(
+          database: dependencies.appDatabase,
+          userScope: userScope,
+          localIdGenerator: () {
+            localIdSequence++;
+            return 'deployment-local-'
+                '${DateTime.now().toUtc().microsecondsSinceEpoch}-'
+                '$localIdSequence';
+          },
         ),
       ),
       currentUserId: actorIdentifier,

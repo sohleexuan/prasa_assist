@@ -1,5 +1,9 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prasa_assist/features/deployments/data/dto/deployment_record_dto.dart';
+import 'package:prasa_assist/features/deployments/data/dto/local_deployment_draft.dart';
 import 'package:prasa_assist/features/deployments/data/sources/supabase_deployment_remote_data_source.dart';
 import 'package:prasa_assist/features/deployments/repositories/deployment_data_exception.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -86,6 +90,35 @@ void main() {
       expect(payload, isNot(contains('version')));
       expect(payload['linked_incident_ref'], 'INC-2026-0142');
       expect(payload['linked_recommendation_ref'], 'REC-0088');
+    });
+
+    test('publishes a local draft without fabricated server fields', () async {
+      final gateway = _FakeGateway()..rpcResponse = _rpcResponse();
+      final source = SupabaseDeploymentRemoteDataSource.withGateway(gateway);
+
+      final created = await source.publishDraft(_localDraft());
+
+      expect(created.deploymentCode, 'DEP-121');
+      expect(gateway.rpcParams.keys, {'p_payload', 'p_expected_version'});
+      expect(gateway.rpcParams['p_expected_version'], isNull);
+      final payload = gateway.rpcParams['p_payload'] as Map<String, dynamic>;
+      expect(payload.keys, {
+        'linked_incident_ref',
+        'linked_recommendation_ref',
+        'route_id',
+        'route_name',
+        'start_time',
+        'end_time',
+        'purpose',
+        'vehicle_ids',
+      });
+      expect(payload, isNot(contains('deployment_code')));
+      expect(payload, isNot(contains('id')));
+      expect(payload, isNot(contains('status')));
+      expect(payload, isNot(contains('created_by')));
+      expect(payload, isNot(contains('created_at')));
+      expect(payload, isNot(contains('updated_at')));
+      expect(payload, isNot(contains('version')));
     });
 
     test(
@@ -197,8 +230,9 @@ void main() {
       });
     }
 
-    test('maps client transport failures to a safe offline error', () async {
-      final gateway = _FakeGateway()..fetchError = StateError('socket detail');
+    test('maps socket connectivity failures to a safe offline error', () async {
+      final gateway = _FakeGateway()
+        ..fetchError = const SocketException('socket detail');
       final source = SupabaseDeploymentRemoteDataSource.withGateway(gateway);
 
       await expectLater(
@@ -210,6 +244,39 @@ void main() {
             isNot(contains('socket detail')),
           ),
         ),
+      );
+    });
+
+    test('maps request timeouts to a safe offline error', () async {
+      final gateway = _FakeGateway()
+        ..fetchError = TimeoutException('timeout detail');
+      final source = SupabaseDeploymentRemoteDataSource.withGateway(gateway);
+
+      await expectLater(
+        source.fetchAll(),
+        throwsA(isA<DeploymentOfflineException>()),
+      );
+    });
+
+    test('does not classify auth failure as offline', () async {
+      final gateway = _FakeGateway()
+        ..fetchError = const AuthException('unsafe auth detail');
+      final source = SupabaseDeploymentRemoteDataSource.withGateway(gateway);
+
+      await expectLater(
+        source.fetchAll(),
+        throwsA(isA<DeploymentPermissionException>()),
+      );
+    });
+
+    test('does not classify an unknown exception as offline', () async {
+      final gateway = _FakeGateway()
+        ..fetchError = StateError('unsafe programming detail');
+      final source = SupabaseDeploymentRemoteDataSource.withGateway(gateway);
+
+      await expectLater(
+        source.fetchAll(),
+        throwsA(isA<DeploymentUnknownDataException>()),
       );
     });
 
@@ -227,6 +294,19 @@ void main() {
 
 const _storageId = '00000000-0000-0000-0000-000000000120';
 const _actorId = '00000000-0000-0000-0000-000000000001';
+
+LocalDeploymentDraft _localDraft() {
+  return LocalDeploymentDraft(
+    routeId: '300',
+    routeName: 'Terminal Maluri ~ Lebuh Ampang',
+    vehicleIds: const ['REPLACEMENT-BUS-01', 'REPLACEMENT-BUS-02'],
+    startTime: DateTime.parse('2026-08-28T04:40:00+08:00'),
+    endTime: DateTime.parse('2026-08-28T05:40:00+08:00'),
+    purpose: 'Replace unavailable Bus B1023',
+    incidentId: 'INC-2026-0142',
+    recommendationId: 'REC-0088',
+  );
+}
 
 DeploymentRecordDto _record({
   int version = 1,

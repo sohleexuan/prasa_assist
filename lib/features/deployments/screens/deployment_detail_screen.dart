@@ -8,6 +8,7 @@ import '../../../shared/widgets/app_error_state.dart';
 import '../../../shared/widgets/app_loading_indicator.dart';
 import '../../../shared/widgets/app_section_card.dart';
 import '../controllers/deployment_controller.dart';
+import '../models/deployment_read_result.dart';
 import '../models/deployment_status.dart';
 import '../models/service_deployment.dart';
 import '../utils/deployment_date_time_formatter.dart';
@@ -143,6 +144,7 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
         children: [
           _PrototypeNotice(
             isPersistent: widget.controller.capabilities.isPersistent,
+            provenance: widget.controller.detailProvenance,
           ),
           if (_isSubmitting) ...[
             const SizedBox(height: AppSpacing.sm),
@@ -716,16 +718,17 @@ class _VehicleItem extends StatelessWidget {
 }
 
 class _PrototypeNotice extends StatelessWidget {
-  const _PrototypeNotice({required this.isPersistent});
+  const _PrototypeNotice({required this.isPersistent, this.provenance});
 
   final bool isPersistent;
+  final DeploymentReadProvenance? provenance;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       container: true,
       label: isPersistent
-          ? 'Authenticated shared deployment data'
+          ? _persistentLabel()
           : 'Prototype data, not live operations',
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -745,7 +748,7 @@ class _PrototypeNotice extends StatelessWidget {
               Expanded(
                 child: Text(
                   isPersistent
-                      ? 'Authenticated shared deployment data'
+                      ? _persistentLabel()
                       : 'Prototype data — not live operations',
                   style: const TextStyle(
                     color: AppColors.onDevelopmentContainer,
@@ -758,6 +761,18 @@ class _PrototypeNotice extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _persistentLabel() {
+    final value = provenance;
+    if (value == null) {
+      return 'Authenticated shared deployment data';
+    }
+    final retrieved = formatDeploymentLocalDateTime(value.retrievedAtUtc);
+    return value.source == DeploymentReadSource.cachedSqlite
+        ? 'Cached/offline SQLite deployment data — not live • '
+              'Cached $retrieved'
+        : 'Live Supabase deployment data • Retrieved $retrieved';
   }
 }
 

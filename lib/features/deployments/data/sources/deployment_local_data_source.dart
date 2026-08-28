@@ -4,6 +4,12 @@ import '../dto/local_deployment_record.dart';
 
 /// Provider-neutral owner-scoped boundary for local deployment work and cache.
 abstract interface class DeploymentLocalDataSource {
+  Future<List<LocalDeploymentRecord>> readConfirmedCacheRecords();
+
+  Future<LocalDeploymentRecord?> readConfirmedCacheRecordByCode(
+    String deploymentCode,
+  );
+
   Future<List<DeploymentRecordDto>> readConfirmedCache();
 
   Future<DeploymentRecordDto?> readConfirmedCacheByCode(String deploymentCode);
