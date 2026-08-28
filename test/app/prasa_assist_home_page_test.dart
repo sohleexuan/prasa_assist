@@ -1,7 +1,11 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:prasa_assist/app/module_registry.dart';
 import 'package:prasa_assist/app/prasa_assist_app.dart';
 import 'package:prasa_assist/core/auth/auth_gateway.dart';
+import 'package:prasa_assist/core/dependencies/app_dependencies_scope.dart';
+import 'package:prasa_assist/features/deployments/repositories/persistent_deployment_repository.dart';
+import 'package:prasa_assist/features/deployments/service_deployment_page.dart';
 
 import '../support/fake_auth_gateway.dart';
 import '../support/test_dependencies.dart';
@@ -11,6 +15,11 @@ void main() {
     'Incident Management',
     'Maintenance Work Orders',
     'Service Deployment',
+    'AI Recommendations',
+  ];
+  const placeholderModuleNames = [
+    'Incident Management',
+    'Maintenance Work Orders',
     'AI Recommendations',
   ];
 
@@ -33,7 +42,7 @@ void main() {
     }
   });
 
-  for (final moduleName in moduleNames) {
+  for (final moduleName in placeholderModuleNames) {
     testWidgets('navigates from $moduleName to its placeholder', (
       tester,
     ) async {
@@ -57,6 +66,70 @@ void main() {
       );
     });
   }
+
+  testWidgets(
+    'deployment registry builder injects Supabase persistence and auth label',
+    (tester) async {
+      final gateway = FakeAuthGateway(
+        initialSession: const AuthSession(
+          userId: 'staff-uuid-1',
+          email: 'staff@example.com',
+        ),
+      );
+      addTearDown(gateway.dispose);
+      final dependencies = createTestDependencies(gateway);
+      final destination = ModuleRegistry.destinations.singleWhere(
+        (destination) => destination.id == 'deployments',
+      );
+      ServiceDeploymentPage? builtPage;
+
+      await tester.pumpWidget(
+        AppDependenciesScope(
+          dependencies: dependencies,
+          child: Builder(
+            builder: (context) {
+              builtPage =
+                  destination.pageBuilder(context) as ServiceDeploymentPage;
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+
+      expect(builtPage, isNotNull);
+      expect(builtPage!.repository, isA<PersistentDeploymentRepository>());
+      expect(builtPage!.currentUserId, 'staff@example.com');
+    },
+  );
+
+  testWidgets(
+    'deployment registry uses stable auth UUID when no email is available',
+    (tester) async {
+      final gateway = FakeAuthGateway(
+        initialSession: const AuthSession(userId: 'staff-uuid-only'),
+      );
+      addTearDown(gateway.dispose);
+      ServiceDeploymentPage? builtPage;
+      final destination = ModuleRegistry.destinations.singleWhere(
+        (destination) => destination.id == 'deployments',
+      );
+
+      await tester.pumpWidget(
+        AppDependenciesScope(
+          dependencies: createTestDependencies(gateway),
+          child: Builder(
+            builder: (context) {
+              builtPage =
+                  destination.pageBuilder(context) as ServiceDeploymentPage;
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+
+      expect(builtPage!.currentUserId, 'staff-uuid-only');
+    },
+  );
 
   testWidgets('home page remains overflow-free at a small phone size', (
     tester,
