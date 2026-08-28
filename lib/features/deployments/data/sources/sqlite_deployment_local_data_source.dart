@@ -51,21 +51,20 @@ class SqliteDeploymentLocalDataSource implements DeploymentLocalDataSource {
   final DateTime Function() _clock;
 
   @override
-  Future<List<DeploymentRecordDto>> readConfirmedCache() {
-    return _guard(() async {
-      final records = await _readRecords(
+  Future<List<LocalDeploymentRecord>> readConfirmedCacheRecords() {
+    return _guard(
+      () => _readRecords(
         where: 'owner_user_id = ? AND sync_state = ?',
         whereArgs: [_ownerUserId, LocalSyncState.cachedRemote.storageValue],
         orderBy: 'start_time_utc ASC',
-      );
-      return List<DeploymentRecordDto>.unmodifiable(
-        records.map((record) => record.toConfirmedDto()),
-      );
-    });
+      ),
+    );
   }
 
   @override
-  Future<DeploymentRecordDto?> readConfirmedCacheByCode(String deploymentCode) {
+  Future<LocalDeploymentRecord?> readConfirmedCacheRecordByCode(
+    String deploymentCode,
+  ) {
     return _guard(() async {
       final normalizedCode = deploymentCode.trim();
       if (normalizedCode.isEmpty) {
@@ -85,8 +84,24 @@ class SqliteDeploymentLocalDataSource implements DeploymentLocalDataSource {
         limit: 2,
       );
       _expectAtMostOne(records);
-      return records.isEmpty ? null : records.single.toConfirmedDto();
+      return records.isEmpty ? null : records.single;
     });
+  }
+
+  @override
+  Future<List<DeploymentRecordDto>> readConfirmedCache() async {
+    final records = await readConfirmedCacheRecords();
+    return List<DeploymentRecordDto>.unmodifiable(
+      records.map((record) => record.toConfirmedDto()),
+    );
+  }
+
+  @override
+  Future<DeploymentRecordDto?> readConfirmedCacheByCode(
+    String deploymentCode,
+  ) async {
+    final record = await readConfirmedCacheRecordByCode(deploymentCode);
+    return record?.toConfirmedDto();
   }
 
   @override
