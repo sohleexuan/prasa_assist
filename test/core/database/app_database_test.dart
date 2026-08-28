@@ -11,7 +11,7 @@ import '../../support/sqlite_test_database.dart';
 void main() {
   group('AppDatabase', () {
     test(
-      'opens schema version 1 with foreign keys and migration metadata',
+      'opens schema version 2 with foreign keys and migration metadata',
       () async {
         final database = createInMemoryTestDatabase();
         addTearDown(database.close);
@@ -26,10 +26,11 @@ void main() {
 
         expect(userVersion.single['user_version'], AppDatabaseSchema.version);
         expect(foreignKeys.single['foreign_keys'], 1);
-        expect(migrations, hasLength(1));
-        expect(migrations.single['version'], 1);
+        expect(migrations.map((row) => row['version']), [1, 2]);
         expect(
-          DateTime.parse(migrations.single['applied_at_utc']! as String).isUtc,
+          migrations.every(
+            (row) => DateTime.parse(row['applied_at_utc']! as String).isUtc,
+          ),
           isTrue,
         );
       },
