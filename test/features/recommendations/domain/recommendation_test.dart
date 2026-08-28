@@ -1,15 +1,37 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation_action.dart';
+import 'package:prasa_assist/features/recommendations/domain/recommendation_confidence.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation_evidence.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation_status.dart';
 
 void main() {
+  RecommendationConfidence buildConfidence({double penalty = 0.15}) =>
+      RecommendationConfidence(
+        factors: [
+          RecommendationConfidenceFactor(
+            factorId: 'vehicle-condition',
+            description: 'Known.',
+            weight: 1,
+            isSupported: true,
+          ),
+        ],
+        penalties: penalty == 0
+            ? const []
+            : [
+                RecommendationConfidencePenalty(
+                  penaltyId: 'demonstration-evidence',
+                  description: 'Demonstration evidence.',
+                  amount: penalty,
+                ),
+              ],
+      );
+
   OperationsRecommendation buildRecommendation({
     List<RecommendationAction>? actions,
     List<RecommendationEvidence>? evidence,
     int score = 85,
-    double confidence = 0.85,
+    RecommendationConfidence? confidenceDetails,
   }) {
     return OperationsRecommendation(
       id: 'recommendation-b1023-route-300',
@@ -35,7 +57,7 @@ void main() {
           ],
       status: RecommendationStatus.pendingReview,
       score: score,
-      confidence: confidence,
+      confidenceDetails: confidenceDetails ?? buildConfidence(),
       createdAt: DateTime.utc(2026, 8, 27, 10),
     );
   }
@@ -63,7 +85,7 @@ void main() {
       ],
       status: RecommendationStatus.pendingReview,
       score: 85,
-      confidence: 0.85,
+      confidenceDetails: buildConfidence(),
       createdAt: createdAt,
     );
 
@@ -94,15 +116,39 @@ void main() {
     expect(() => buildRecommendation(score: 0), returnsNormally);
     expect(() => buildRecommendation(score: 100), returnsNormally);
   });
-  test('confidence must be from 0.0 through 1.0 inclusive', () {
-    expect(() => buildRecommendation(confidence: -0.01), throwsArgumentError);
-    expect(() => buildRecommendation(confidence: 1.01), throwsArgumentError);
+  test('confidence getter has confidenceDetails as its only stored source', () {
+    final details = buildConfidence();
+    final recommendation = buildRecommendation(confidenceDetails: details);
+
+    expect(identical(recommendation.confidenceDetails, details), isTrue);
     expect(
-      () => buildRecommendation(confidence: double.nan),
-      throwsArgumentError,
+      recommendation.confidence,
+      recommendation.confidenceDetails.finalConfidence,
     );
-    expect(() => buildRecommendation(confidence: 0.0), returnsNormally);
-    expect(() => buildRecommendation(confidence: 1.0), returnsNormally);
+    expect(recommendation.confidence, 0.85);
+  });
+  test('normalizes createdAt to UTC', () {
+    final recommendation = OperationsRecommendation(
+      id: 'recommendation-1',
+      incidentId: 'incident-1',
+      vehicleId: 'B1023',
+      routeId: '300',
+      actions: [InspectOrRepairVehicleAction(vehicleId: 'B1023')],
+      evidence: [
+        RecommendationEvidence(
+          ruleId: 'breakdown',
+          description: 'Confirmed breakdown.',
+          dataClassification: EvidenceDataClassification.demonstrationData,
+          contribution: 50,
+        ),
+      ],
+      status: RecommendationStatus.pendingReview,
+      score: 50,
+      confidenceDetails: buildConfidence(),
+      createdAt: DateTime(2026, 8, 28, 10),
+    );
+
+    expect(recommendation.createdAt.isUtc, isTrue);
   });
   test('requires at least one evidence item', () {
     expect(() => buildRecommendation(evidence: []), throwsArgumentError);
