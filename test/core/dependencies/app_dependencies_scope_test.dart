@@ -14,6 +14,7 @@ void main() {
     final dependencies = createTestDependencies(gateway);
     late Object resolvedClient;
     late Object resolvedGateway;
+    late Object resolvedDatabase;
 
     await tester.pumpWidget(
       AppDependenciesScope(
@@ -23,6 +24,7 @@ void main() {
             final resolved = AppDependenciesScope.of(context);
             resolvedClient = resolved.supabaseClient;
             resolvedGateway = resolved.authGateway;
+            resolvedDatabase = resolved.appDatabase;
             return const SizedBox();
           },
         ),
@@ -31,5 +33,6 @@ void main() {
 
     expect(resolvedClient, same(dependencies.supabaseClient));
     expect(resolvedGateway, same(gateway));
+    expect(resolvedDatabase, same(dependencies.appDatabase));
   });
 }

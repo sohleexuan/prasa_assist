@@ -1,4 +1,5 @@
 import '../dto/deployment_record_dto.dart';
+import '../dto/local_deployment_draft.dart';
 
 /// Persistence-provider boundary for deployment records.
 ///
@@ -26,4 +27,11 @@ abstract class DeploymentRemoteDataSource {
   });
 
   Future<void> delete(String deploymentCode, {required int expectedVersion});
+}
+
+/// Remote create boundary that accepts only staff-controlled draft values.
+///
+/// Supabase assigns the deployment code, actor, timestamps, status and version.
+abstract interface class DeploymentDraftRemotePublisher {
+  Future<DeploymentRecordDto> publishDraft(LocalDeploymentDraft draft);
 }

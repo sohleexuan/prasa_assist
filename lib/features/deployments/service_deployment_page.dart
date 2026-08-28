@@ -1,9 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'controllers/deployment_controller.dart';
+import 'controllers/route_catalog_controller.dart';
+import 'data/dto/local_deployment_record.dart';
 import 'models/service_deployment.dart';
+import 'repositories/bundled_route_catalog_repository.dart';
 import 'repositories/deployment_repository.dart';
 import 'repositories/in_memory_deployment_repository.dart';
+import 'repositories/route_catalog_repository.dart';
 import 'screens/deployment_detail_screen.dart';
 import 'screens/deployment_form_screen.dart';
 import 'screens/deployment_list_screen.dart';
@@ -15,6 +21,7 @@ import 'screens/deployment_list_screen.dart';
 class ServiceDeploymentPage extends StatefulWidget {
   const ServiceDeploymentPage({
     this.repository,
+    this.routeCatalogRepository,
     this.currentUserId = prototypeUserId,
     this.clock,
     this.deploymentIdGenerator,
@@ -24,6 +31,7 @@ class ServiceDeploymentPage extends StatefulWidget {
   static const String prototypeUserId = 'demo-operations-staff';
 
   final DeploymentRepository? repository;
+  final RouteCatalogRepository? routeCatalogRepository;
   final String currentUserId;
   final DateTime Function()? clock;
   final String Function(int sequence)? deploymentIdGenerator;
@@ -35,6 +43,8 @@ class ServiceDeploymentPage extends StatefulWidget {
 class _ServiceDeploymentPageState extends State<ServiceDeploymentPage> {
   late final DeploymentRepository _repository;
   late final DeploymentController _controller;
+  late final RouteCatalogController _routeCatalogController;
+  late final Future<void> _routeCatalogLoad;
   final Set<String> _issuedDeploymentIds = {'DEP-120'};
   int _deploymentIdSequence = 0;
 
@@ -50,11 +60,22 @@ class _ServiceDeploymentPageState extends State<ServiceDeploymentPage> {
       repository: _repository,
       clock: () => _now,
     );
+    _routeCatalogController = RouteCatalogController(
+      widget.routeCatalogRepository ?? const BundledRouteCatalogRepository(),
+    );
+    _routeCatalogLoad = _routeCatalogController.loadCatalog();
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    if (_routeCatalogController.state == RouteCatalogLoadState.loading) {
+      unawaited(
+        _routeCatalogLoad.whenComplete(_routeCatalogController.dispose),
+      );
+    } else {
+      _routeCatalogController.dispose();
+    }
     super.dispose();
   }
 
@@ -65,18 +86,23 @@ class _ServiceDeploymentPageState extends State<ServiceDeploymentPage> {
       onCreateDeployment: () => _openCreateForm(context),
       onOpenDeployment: (deployment) =>
           _openDeploymentDetails(context, deployment.deploymentId),
+      onEditLocalWork: (record) => _openLocalDraftForm(context, record),
+      onPublishLocalWork: (record) => _publishLocalWork(context, record),
+      onDiscardLocalWork: (record) => _discardLocalWork(context, record),
     );
   }
 
   Future<void> _openCreateForm(BuildContext context) async {
-    final saved = await Navigator.of(context).push<ServiceDeployment>(
-      MaterialPageRoute<ServiceDeployment>(
+    final saved = await Navigator.of(context).push<Object?>(
+      MaterialPageRoute<Object?>(
         builder: (formContext) => DeploymentFormScreen(
           controller: _controller,
+          routeCatalogController: _routeCatalogController,
           currentUserId: widget.currentUserId,
           deploymentIdGenerator: _nextDeploymentId,
           clock: () => _now,
           onSaved: (deployment) => Navigator.of(formContext).pop(deployment),
+          onLocalSaved: (record) => Navigator.of(formContext).pop(record),
           onCancel: () => Navigator.of(formContext).pop(),
         ),
       ),
@@ -87,6 +113,77 @@ class _ServiceDeploymentPageState extends State<ServiceDeploymentPage> {
     await _controller.loadDeployments();
   }
 
+  Future<void> _openLocalDraftForm(
+    BuildContext context,
+    LocalDeploymentRecord record,
+  ) async {
+    final saved = await Navigator.of(context).push<LocalDeploymentRecord>(
+      MaterialPageRoute<LocalDeploymentRecord>(
+        builder: (formContext) => DeploymentFormScreen(
+          controller: _controller,
+          routeCatalogController: _routeCatalogController,
+          currentUserId: widget.currentUserId,
+          existingLocalWorkItem: record,
+          clock: () => _now,
+          onLocalSaved: (updated) => Navigator.of(formContext).pop(updated),
+          onCancel: () => Navigator.of(formContext).pop(),
+        ),
+      ),
+    );
+    if (mounted && saved != null) {
+      await _controller.loadDeployments();
+    }
+  }
+
+  Future<void> _publishLocalWork(
+    BuildContext context,
+    LocalDeploymentRecord record,
+  ) async {
+    final published = await _controller.publishLocalDraft(record.localId);
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          published
+              ? 'Deployment published and confirmed by Supabase.'
+              : _controller.errorMessage ?? 'Unable to publish deployment.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _discardLocalWork(
+    BuildContext context,
+    LocalDeploymentRecord record,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Discard local draft?'),
+        content: const Text(
+          'This removes only the unpublished draft stored on this device. '
+          'It does not delete any Supabase deployment.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Keep draft'),
+          ),
+          FilledButton(
+            key: const ValueKey('confirm-discard-local-draft'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _controller.discardLocalDraft(record.localId);
+    }
+  }
+
   Future<void> _openDeploymentDetails(
     BuildContext context,
     String deploymentId,
@@ -95,6 +192,7 @@ class _ServiceDeploymentPageState extends State<ServiceDeploymentPage> {
       MaterialPageRoute<void>(
         builder: (_) => _DeploymentDetailPage(
           controller: _controller,
+          routeCatalogController: _routeCatalogController,
           deploymentId: deploymentId,
           currentUserId: widget.currentUserId,
           clock: () => _now,
@@ -128,12 +226,14 @@ class _ServiceDeploymentPageState extends State<ServiceDeploymentPage> {
 class _DeploymentDetailPage extends StatefulWidget {
   const _DeploymentDetailPage({
     required this.controller,
+    required this.routeCatalogController,
     required this.deploymentId,
     required this.currentUserId,
     required this.clock,
   });
 
   final DeploymentController controller;
+  final RouteCatalogController routeCatalogController;
   final String deploymentId;
   final String currentUserId;
   final DateTime Function() clock;
@@ -165,6 +265,7 @@ class _DeploymentDetailPageState extends State<_DeploymentDetailPage> {
       MaterialPageRoute<ServiceDeployment>(
         builder: (formContext) => DeploymentFormScreen(
           controller: widget.controller,
+          routeCatalogController: widget.routeCatalogController,
           currentUserId: widget.currentUserId,
           existingDeployment: deployment,
           clock: widget.clock,

@@ -4,7 +4,7 @@ import 'package:prasa_assist/app/module_registry.dart';
 import 'package:prasa_assist/app/prasa_assist_app.dart';
 import 'package:prasa_assist/core/auth/auth_gateway.dart';
 import 'package:prasa_assist/core/dependencies/app_dependencies_scope.dart';
-import 'package:prasa_assist/features/deployments/repositories/persistent_deployment_repository.dart';
+import 'package:prasa_assist/features/deployments/repositories/hybrid_deployment_repository.dart';
 import 'package:prasa_assist/features/deployments/service_deployment_page.dart';
 import 'package:prasa_assist/features/incidents/incident_module.dart';
 
@@ -150,7 +150,7 @@ void main() {
     (tester) async {
       final gateway = FakeAuthGateway(
         initialSession: const AuthSession(
-          userId: 'staff-uuid-1',
+          userId: '11111111-1111-4111-8111-111111111111',
           email: 'staff@example.com',
         ),
       );
@@ -175,7 +175,7 @@ void main() {
       );
 
       expect(builtPage, isNotNull);
-      expect(builtPage!.repository, isA<PersistentDeploymentRepository>());
+      expect(builtPage!.repository, isA<HybridDeploymentRepository>());
       expect(builtPage!.currentUserId, 'staff@example.com');
     },
   );
@@ -184,7 +184,9 @@ void main() {
     'deployment registry uses stable auth UUID when no email is available',
     (tester) async {
       final gateway = FakeAuthGateway(
-        initialSession: const AuthSession(userId: 'staff-uuid-only'),
+        initialSession: const AuthSession(
+          userId: '22222222-2222-4222-8222-222222222222',
+        ),
       );
       addTearDown(gateway.dispose);
       ServiceDeploymentPage? builtPage;
@@ -205,7 +207,7 @@ void main() {
         ),
       );
 
-      expect(builtPage!.currentUserId, 'staff-uuid-only');
+      expect(builtPage!.currentUserId, '22222222-2222-4222-8222-222222222222');
     },
   );
 

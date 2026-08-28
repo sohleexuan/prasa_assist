@@ -6,19 +6,26 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
 import '../../../shared/widgets/app_section_card.dart';
 import '../controllers/deployment_controller.dart';
+import '../controllers/route_catalog_controller.dart';
+import '../data/dto/local_deployment_draft.dart';
+import '../data/dto/local_deployment_record.dart';
 import '../models/deployment_prefill.dart';
 import '../models/deployment_status.dart';
 import '../models/service_deployment.dart';
 import '../utils/deployment_date_time_formatter.dart';
 import '../widgets/deployment_status_chip.dart';
+import '../widgets/route_catalog_selector.dart';
 
 class DeploymentFormScreen extends StatefulWidget {
   const DeploymentFormScreen({
     required this.controller,
+    required this.routeCatalogController,
     required this.currentUserId,
     this.existingDeployment,
+    this.existingLocalWorkItem,
     this.prefill,
     this.onSaved,
+    this.onLocalSaved,
     this.onCancel,
     this.deploymentIdGenerator,
     this.clock,
@@ -26,10 +33,13 @@ class DeploymentFormScreen extends StatefulWidget {
   });
 
   final DeploymentController controller;
+  final RouteCatalogController routeCatalogController;
   final String currentUserId;
   final ServiceDeployment? existingDeployment;
+  final LocalDeploymentRecord? existingLocalWorkItem;
   final DeploymentPrefill? prefill;
   final ValueChanged<ServiceDeployment>? onSaved;
+  final ValueChanged<LocalDeploymentRecord>? onLocalSaved;
   final VoidCallback? onCancel;
   final String Function()? deploymentIdGenerator;
   final DateTime Function()? clock;
@@ -55,7 +65,12 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
   String? _timeError;
   String? _submissionError;
 
-  bool get _isEditMode => widget.existingDeployment != null;
+  bool get _isEditMode =>
+      widget.existingDeployment != null || widget.existingLocalWorkItem != null;
+
+  bool get _isLocalMode =>
+      widget.controller.supportsLocalDrafts &&
+      widget.existingDeployment == null;
 
   bool get _isReadOnly {
     final status = widget.existingDeployment?.status;
@@ -66,6 +81,7 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
 
   bool get _canSchedule =>
       !_isReadOnly &&
+      !_isLocalMode &&
       (widget.existingDeployment == null ||
           widget.existingDeployment!.status == DeploymentStatus.draft);
 
@@ -76,37 +92,63 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
     super.initState();
     final now = _now.toLocal();
     final existing = widget.existingDeployment;
+    final localWork = widget.existingLocalWorkItem;
+    final localDraft = localWork?.draft;
     final prefill = existing == null ? widget.prefill : null;
-    final generatedId =
-        widget.deploymentIdGenerator?.call() ??
-        'DEP-${now.microsecondsSinceEpoch}';
+    final generatedId = _isLocalMode
+        ? localWork?.localId ?? 'Assigned after publication'
+        : widget.deploymentIdGenerator?.call() ??
+              'DEP-${now.microsecondsSinceEpoch}';
 
     _deploymentIdController = TextEditingController(
       text: existing?.deploymentId ?? generatedId,
     );
     _routeIdController = TextEditingController(
-      text: existing?.routeId ?? prefill?.routeId ?? '',
+      text: existing?.routeId ?? localDraft?.routeId ?? prefill?.routeId ?? '',
     );
     _routeNameController = TextEditingController(
-      text: existing?.routeName ?? prefill?.routeName ?? '',
+      text:
+          existing?.routeName ??
+          localDraft?.routeName ??
+          prefill?.routeName ??
+          '',
     );
     _vehicleIdsController = TextEditingController(
-      text: existing?.vehicleIds.join(', ') ?? '',
+      text:
+          existing?.vehicleIds.join(', ') ??
+          localDraft?.vehicleIds.join(', ') ??
+          '',
     );
     _purposeController = TextEditingController(
-      text: existing?.purpose ?? prefill?.suggestedPurpose ?? '',
+      text:
+          existing?.purpose ??
+          localDraft?.purpose ??
+          prefill?.suggestedPurpose ??
+          '',
     );
     _incidentIdController = TextEditingController(
-      text: existing?.incidentId ?? prefill?.incidentId ?? '',
+      text:
+          existing?.incidentId ??
+          localDraft?.incidentId ??
+          prefill?.incidentId ??
+          '',
     );
     _recommendationIdController = TextEditingController(
-      text: existing?.sourceRecommendationId ?? prefill?.recommendationId ?? '',
+      text:
+          existing?.sourceRecommendationId ??
+          localDraft?.recommendationId ??
+          prefill?.recommendationId ??
+          '',
     );
     _startTime =
-        (existing?.startTime ?? prefill?.suggestedStartTime)?.toLocal() ??
+        (existing?.startTime ??
+                localDraft?.startTime ??
+                prefill?.suggestedStartTime)
+            ?.toLocal() ??
         _toMinute(now);
     _endTime =
-        (existing?.endTime ?? prefill?.suggestedEndTime)?.toLocal() ??
+        (existing?.endTime ?? localDraft?.endTime ?? prefill?.suggestedEndTime)
+            ?.toLocal() ??
         _startTime.add(const Duration(hours: 1));
   }
 
@@ -126,7 +168,11 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
   @override
   Widget build(BuildContext context) {
     return AppPageScaffold(
-      title: _isEditMode ? 'Edit Deployment' : 'New Deployment',
+      title: widget.existingLocalWorkItem != null
+          ? 'Edit Local Draft'
+          : _isEditMode
+          ? 'Edit Deployment'
+          : 'New Deployment',
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: Form(
@@ -147,6 +193,7 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
               children: [
                 _PrototypeNotice(
                   isPersistent: widget.controller.capabilities.isPersistent,
+                  isLocalDraft: _isLocalMode,
                 ),
                 if (_isReadOnly) ...[
                   const SizedBox(height: AppSpacing.sm),
@@ -178,9 +225,9 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
                           helperText: 'Generated automatically and read-only',
                           prefixIcon: Icon(Icons.tag),
                         ),
-                        validator: _requiredDeploymentId,
+                        validator: _isLocalMode ? null : _requiredDeploymentId,
                       ),
-                      if (_isEditMode) ...[
+                      if (widget.existingDeployment != null) ...[
                         const SizedBox(height: AppSpacing.sm),
                         Wrap(
                           crossAxisAlignment: WrapCrossAlignment.center,
@@ -204,6 +251,20 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      RouteCatalogSelector(
+                        controller: widget.routeCatalogController,
+                        enabled: !_isReadOnly && !_isSubmitting,
+                        onRouteSelected: (route) {
+                          if (_isReadOnly || _isSubmitting) {
+                            return;
+                          }
+                          setState(() {
+                            _routeIdController.text = route.routeShortName;
+                            _routeNameController.text = route.routeLongName;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
                       TextFormField(
                         key: const ValueKey('route-id-field'),
                         controller: _routeIdController,
@@ -211,10 +272,7 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
                         textInputAction: TextInputAction.next,
                         decoration: InputDecoration(
                           labelText: 'Route ID',
-                          helperText:
-                              widget.controller.capabilities.isPersistent
-                              ? 'Manual entry — not connected to GTFS route data'
-                              : 'Prototype entry — not connected to GTFS route data',
+                          helperText: 'Enter manually or select above',
                           prefixIcon: const Icon(Icons.signpost_outlined),
                         ),
                         validator: (value) =>
@@ -381,7 +439,13 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
           ),
           onPressed: _isSubmitting ? null : () => _submit(schedule: false),
           icon: const Icon(Icons.save_outlined),
-          label: Text(_isEditMode ? 'Save Changes' : 'Save Draft'),
+          label: Text(
+            _isEditMode
+                ? 'Save Changes'
+                : _isLocalMode
+                ? 'Save Local Draft'
+                : 'Save Draft',
+          ),
         ),
       );
       if (_canSchedule) {
@@ -429,7 +493,7 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
     if (!fieldsAreValid || _timeError != null) {
       return;
     }
-    if (widget.currentUserId.trim().isEmpty) {
+    if (!_isLocalMode && widget.currentUserId.trim().isEmpty) {
       setState(() {
         _submissionError = 'Current user ID is required.';
       });
@@ -437,6 +501,44 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
     }
 
     final existing = widget.existingDeployment;
+    if (_isLocalMode) {
+      final draft = LocalDeploymentDraft(
+        routeId: _routeIdController.text,
+        routeName: _routeNameController.text,
+        vehicleIds: _parseVehicleIds(),
+        startTime: _startTime,
+        endTime: _endTime,
+        purpose: _purposeController.text,
+        incidentId: _optionalText(_incidentIdController.text),
+        recommendationId: _optionalText(_recommendationIdController.text),
+      );
+      setState(() {
+        _isSubmitting = true;
+      });
+      final existingLocal = widget.existingLocalWorkItem;
+      final saved = existingLocal == null
+          ? await widget.controller.createLocalDraft(draft)
+          : await widget.controller.updateLocalDraft(
+              existingLocal.localId,
+              draft,
+            );
+      if (!mounted) {
+        return;
+      }
+      if (!saved) {
+        _finishWithControllerError();
+        return;
+      }
+      final localRecord = widget.controller.selectedLocalWorkItem;
+      setState(() {
+        _isSubmitting = false;
+        _submissionError = null;
+      });
+      if (localRecord != null) {
+        widget.onLocalSaved?.call(localRecord);
+      }
+      return;
+    }
     final timestamp = _now;
     final deployment = ServiceDeployment(
       deploymentId: _deploymentIdController.text.trim(),
@@ -529,6 +631,9 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
     final normalizedIds = vehicleIds.map((id) => id.toLowerCase()).toList();
     if (normalizedIds.toSet().length != normalizedIds.length) {
       return 'Vehicle IDs cannot contain duplicates.';
+    }
+    if (normalizedIds.contains('b1023')) {
+      return 'Unavailable Bus B1023 cannot be a replacement vehicle.';
     }
     return null;
   }
@@ -710,15 +815,21 @@ class _DateTimeControls extends StatelessWidget {
 }
 
 class _PrototypeNotice extends StatelessWidget {
-  const _PrototypeNotice({required this.isPersistent});
+  const _PrototypeNotice({
+    required this.isPersistent,
+    required this.isLocalDraft,
+  });
 
   final bool isPersistent;
+  final bool isLocalDraft;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       container: true,
-      label: isPersistent
+      label: isLocalDraft
+          ? 'Local draft, not published to Supabase'
+          : isPersistent
           ? 'Authenticated shared deployment data'
           : 'Prototype data, not live operations',
       child: DecoratedBox(
@@ -738,7 +849,9 @@ class _PrototypeNotice extends StatelessWidget {
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
-                  isPersistent
+                  isLocalDraft
+                      ? 'Local draft — stored on this device, not published'
+                      : isPersistent
                       ? 'Authenticated shared deployment data'
                       : 'Prototype data — not live operations',
                   style: const TextStyle(
