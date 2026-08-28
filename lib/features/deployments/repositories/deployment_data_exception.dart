@@ -42,3 +42,7 @@ class DeploymentMappingException extends DeploymentDataException {
 class DeploymentUnknownDataException extends DeploymentDataException {
   const DeploymentUnknownDataException(super.message, {super.cause});
 }
+
+class DeploymentLocalStorageException extends DeploymentDataException {
+  const DeploymentLocalStorageException(super.message, {super.cause});
+}
