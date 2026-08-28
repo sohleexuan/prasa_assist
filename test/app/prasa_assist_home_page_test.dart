@@ -1,6 +1,14 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:prasa_assist/app/module_registry.dart';
 import 'package:prasa_assist/app/prasa_assist_app.dart';
+import 'package:prasa_assist/core/auth/auth_gateway.dart';
+import 'package:prasa_assist/core/dependencies/app_dependencies_scope.dart';
+import 'package:prasa_assist/features/deployments/repositories/hybrid_deployment_repository.dart';
+import 'package:prasa_assist/features/deployments/service_deployment_page.dart';
+
+import '../support/fake_auth_gateway.dart';
+import '../support/test_dependencies.dart';
 
 void main() {
   const moduleNames = [
@@ -9,11 +17,16 @@ void main() {
     'Service Deployment',
     'AI Recommendations',
   ];
+  const placeholderModuleNames = [
+    'Incident Management',
+    'Maintenance Work Orders',
+    'AI Recommendations',
+  ];
 
   testWidgets('home page renders foundation messaging and four modules', (
     tester,
   ) async {
-    await tester.pumpWidget(const PrasaAssistApp());
+    await _pumpAuthenticatedApp(tester);
 
     expect(find.text('Development foundation'), findsOneWidget);
     expect(find.text('AI recommends. Staff decides.'), findsOneWidget);
@@ -29,11 +42,11 @@ void main() {
     }
   });
 
-  for (final moduleName in moduleNames) {
+  for (final moduleName in placeholderModuleNames) {
     testWidgets('navigates from $moduleName to its placeholder', (
       tester,
     ) async {
-      await tester.pumpWidget(const PrasaAssistApp());
+      await _pumpAuthenticatedApp(tester);
 
       final moduleEntry = find.text(moduleName);
       await tester.scrollUntilVisible(
@@ -54,6 +67,72 @@ void main() {
     });
   }
 
+  testWidgets(
+    'deployment registry builder injects Supabase persistence and auth label',
+    (tester) async {
+      final gateway = FakeAuthGateway(
+        initialSession: const AuthSession(
+          userId: '11111111-1111-4111-8111-111111111111',
+          email: 'staff@example.com',
+        ),
+      );
+      addTearDown(gateway.dispose);
+      final dependencies = createTestDependencies(gateway);
+      final destination = ModuleRegistry.destinations.singleWhere(
+        (destination) => destination.id == 'deployments',
+      );
+      ServiceDeploymentPage? builtPage;
+
+      await tester.pumpWidget(
+        AppDependenciesScope(
+          dependencies: dependencies,
+          child: Builder(
+            builder: (context) {
+              builtPage =
+                  destination.pageBuilder(context) as ServiceDeploymentPage;
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+
+      expect(builtPage, isNotNull);
+      expect(builtPage!.repository, isA<HybridDeploymentRepository>());
+      expect(builtPage!.currentUserId, 'staff@example.com');
+    },
+  );
+
+  testWidgets(
+    'deployment registry uses stable auth UUID when no email is available',
+    (tester) async {
+      final gateway = FakeAuthGateway(
+        initialSession: const AuthSession(
+          userId: '22222222-2222-4222-8222-222222222222',
+        ),
+      );
+      addTearDown(gateway.dispose);
+      ServiceDeploymentPage? builtPage;
+      final destination = ModuleRegistry.destinations.singleWhere(
+        (destination) => destination.id == 'deployments',
+      );
+
+      await tester.pumpWidget(
+        AppDependenciesScope(
+          dependencies: createTestDependencies(gateway),
+          child: Builder(
+            builder: (context) {
+              builtPage =
+                  destination.pageBuilder(context) as ServiceDeploymentPage;
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+
+      expect(builtPage!.currentUserId, '22222222-2222-4222-8222-222222222222');
+    },
+  );
+
   testWidgets('home page remains overflow-free at a small phone size', (
     tester,
   ) async {
@@ -62,7 +141,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const PrasaAssistApp());
+    await _pumpAuthenticatedApp(tester);
     await tester.pump();
 
     expect(tester.takeException(), isNull);
@@ -76,4 +155,15 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('AI Recommendations'), findsOneWidget);
   });
+}
+
+Future<void> _pumpAuthenticatedApp(WidgetTester tester) async {
+  final gateway = FakeAuthGateway(
+    initialSession: const AuthSession(userId: 'staff-1'),
+  );
+  addTearDown(gateway.dispose);
+  await tester.pumpWidget(
+    PrasaAssistApp(dependencies: createTestDependencies(gateway)),
+  );
+  await tester.pump();
 }
