@@ -13,13 +13,15 @@ void main() {
     );
     addTearDown(gateway.dispose);
 
-    await tester.pumpWidget(
-      PrasaAssistApp(dependencies: createTestDependencies(gateway)),
-    );
+    final dependencies = createTestDependencies(gateway);
+    await tester.pumpWidget(PrasaAssistApp(dependencies: dependencies));
     await tester.pump();
 
     expect(find.byType(MaterialApp), findsOneWidget);
     expect(find.text('PrasaAssist'), findsOneWidget);
     expect(find.text('Operations workspace'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+    expect(dependencies.appDatabase.isClosed, isTrue);
   });
 }

@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prasa_assist/core/bootstrap/app_bootstrap.dart';
 import 'package:prasa_assist/core/config/app_config.dart';
+import 'package:prasa_assist/core/database/app_database.dart';
+import 'package:prasa_assist/core/database/app_database_opener.dart';
 import 'package:prasa_assist/core/supabase/supabase_initializer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -21,17 +23,22 @@ void main() {
       );
       final initializer = _FakeInitializer(client);
       final gateway = FakeAuthGateway();
+      final database = AppDatabase(opener: AppDatabaseOpener.unsupported());
       addTearDown(gateway.dispose);
+      addTearDown(database.close);
 
       final dependencies = await bootstrapApplication(
         config: config,
         initializer: initializer,
         authGatewayFactory: (_) => gateway,
+        appDatabaseFactory: () => database,
       );
 
       expect(initializer.receivedConfig, same(config));
       expect(dependencies.supabaseClient, same(client));
       expect(dependencies.authGateway, same(gateway));
+      expect(dependencies.appDatabase, same(database));
+      expect(database.isOpen, isFalse);
     },
   );
 }
