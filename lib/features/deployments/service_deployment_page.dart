@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'controllers/deployment_controller.dart';
 import 'controllers/route_catalog_controller.dart';
+import 'data/dto/local_deployment_record.dart';
 import 'models/service_deployment.dart';
 import 'repositories/bundled_route_catalog_repository.dart';
 import 'repositories/deployment_repository.dart';
@@ -85,12 +86,15 @@ class _ServiceDeploymentPageState extends State<ServiceDeploymentPage> {
       onCreateDeployment: () => _openCreateForm(context),
       onOpenDeployment: (deployment) =>
           _openDeploymentDetails(context, deployment.deploymentId),
+      onEditLocalWork: (record) => _openLocalDraftForm(context, record),
+      onPublishLocalWork: (record) => _publishLocalWork(context, record),
+      onDiscardLocalWork: (record) => _discardLocalWork(context, record),
     );
   }
 
   Future<void> _openCreateForm(BuildContext context) async {
-    final saved = await Navigator.of(context).push<ServiceDeployment>(
-      MaterialPageRoute<ServiceDeployment>(
+    final saved = await Navigator.of(context).push<Object?>(
+      MaterialPageRoute<Object?>(
         builder: (formContext) => DeploymentFormScreen(
           controller: _controller,
           routeCatalogController: _routeCatalogController,
@@ -98,6 +102,7 @@ class _ServiceDeploymentPageState extends State<ServiceDeploymentPage> {
           deploymentIdGenerator: _nextDeploymentId,
           clock: () => _now,
           onSaved: (deployment) => Navigator.of(formContext).pop(deployment),
+          onLocalSaved: (record) => Navigator.of(formContext).pop(record),
           onCancel: () => Navigator.of(formContext).pop(),
         ),
       ),
@@ -106,6 +111,77 @@ class _ServiceDeploymentPageState extends State<ServiceDeploymentPage> {
       return;
     }
     await _controller.loadDeployments();
+  }
+
+  Future<void> _openLocalDraftForm(
+    BuildContext context,
+    LocalDeploymentRecord record,
+  ) async {
+    final saved = await Navigator.of(context).push<LocalDeploymentRecord>(
+      MaterialPageRoute<LocalDeploymentRecord>(
+        builder: (formContext) => DeploymentFormScreen(
+          controller: _controller,
+          routeCatalogController: _routeCatalogController,
+          currentUserId: widget.currentUserId,
+          existingLocalWorkItem: record,
+          clock: () => _now,
+          onLocalSaved: (updated) => Navigator.of(formContext).pop(updated),
+          onCancel: () => Navigator.of(formContext).pop(),
+        ),
+      ),
+    );
+    if (mounted && saved != null) {
+      await _controller.loadDeployments();
+    }
+  }
+
+  Future<void> _publishLocalWork(
+    BuildContext context,
+    LocalDeploymentRecord record,
+  ) async {
+    final published = await _controller.publishLocalDraft(record.localId);
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          published
+              ? 'Deployment published and confirmed by Supabase.'
+              : _controller.errorMessage ?? 'Unable to publish deployment.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _discardLocalWork(
+    BuildContext context,
+    LocalDeploymentRecord record,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Discard local draft?'),
+        content: const Text(
+          'This removes only the unpublished draft stored on this device. '
+          'It does not delete any Supabase deployment.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Keep draft'),
+          ),
+          FilledButton(
+            key: const ValueKey('confirm-discard-local-draft'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _controller.discardLocalDraft(record.localId);
+    }
   }
 
   Future<void> _openDeploymentDetails(

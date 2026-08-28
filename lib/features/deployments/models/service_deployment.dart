@@ -64,6 +64,9 @@ class ServiceDeployment {
         normalizedVehicleIds.length) {
       errors.add('Vehicle IDs cannot contain duplicates.');
     }
+    if (normalizedVehicleIds.any((id) => id.toLowerCase() == 'b1023')) {
+      errors.add('Unavailable Bus B1023 cannot be a replacement vehicle.');
+    }
     if (!endTime.isAfter(startTime)) {
       errors.add('End time must be after start time.');
     }

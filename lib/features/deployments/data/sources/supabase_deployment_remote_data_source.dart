@@ -4,7 +4,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../repositories/deployment_data_exception.dart';
 import '../dto/deployment_record_dto.dart';
+import '../dto/local_deployment_draft.dart';
 import 'deployment_remote_data_source.dart';
+import 'src/deployment_transport_classifier.dart';
 
 abstract interface class DeploymentSupabaseGateway {
   Future<Object?> fetchAllDeploymentRows();
@@ -47,7 +49,8 @@ class SupabaseDeploymentGateway implements DeploymentSupabaseGateway {
   }
 }
 
-class SupabaseDeploymentRemoteDataSource implements DeploymentRemoteDataSource {
+class SupabaseDeploymentRemoteDataSource
+    implements DeploymentRemoteDataSource, DeploymentDraftRemotePublisher {
   SupabaseDeploymentRemoteDataSource(SupabaseClient client)
     : this.withGateway(SupabaseDeploymentGateway(client));
 
@@ -90,6 +93,26 @@ class SupabaseDeploymentRemoteDataSource implements DeploymentRemoteDataSource {
     final response = await _request(
       () => _gateway.invokeRpc(saveRpc, <String, dynamic>{
         'p_payload': _savePayload(record, includeDeploymentCode: false),
+        'p_expected_version': null,
+      }),
+    );
+    return _recordFromResponse(response);
+  }
+
+  @override
+  Future<DeploymentRecordDto> publishDraft(LocalDeploymentDraft draft) async {
+    final response = await _request(
+      () => _gateway.invokeRpc(saveRpc, <String, dynamic>{
+        'p_payload': <String, dynamic>{
+          'linked_incident_ref': draft.incidentId,
+          'linked_recommendation_ref': draft.recommendationId,
+          'route_id': draft.routeId,
+          'route_name': draft.routeName,
+          'start_time': draft.startTime.toUtc().toIso8601String(),
+          'end_time': draft.endTime.toUtc().toIso8601String(),
+          'purpose': draft.purpose,
+          'vehicle_ids': List<String>.from(draft.vehicleIds),
+        },
         'p_expected_version': null,
       }),
     );
@@ -216,8 +239,14 @@ class SupabaseDeploymentRemoteDataSource implements DeploymentRemoteDataSource {
         cause: error,
       );
     } catch (error) {
-      throw DeploymentOfflineException(
-        'Deployment data is unavailable. Check the connection and try again.',
+      if (isDeploymentTransportFailure(error)) {
+        throw DeploymentOfflineException(
+          'Deployment data is unavailable. Check the connection and try again.',
+          cause: error,
+        );
+      }
+      throw DeploymentUnknownDataException(
+        'Unable to complete the deployment data operation.',
         cause: error,
       );
     }

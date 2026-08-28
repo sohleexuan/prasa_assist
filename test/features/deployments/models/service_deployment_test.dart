@@ -130,6 +130,14 @@ void main() {
       );
     });
 
+    test('rejects unavailable Bus B1023 as a replacement vehicle', () {
+      expect(
+        _deployment(vehicleIds: const ['REPLACEMENT-BUS-01', 'b1023'])
+            .validate(),
+        contains('Unavailable Bus B1023 cannot be a replacement vehicle.'),
+      );
+    });
+
     test('requires end time to be after start time', () {
       final startTime = DateTime(2026, 8, 27, 8);
 
