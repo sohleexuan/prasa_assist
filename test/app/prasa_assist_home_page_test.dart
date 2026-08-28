@@ -6,6 +6,7 @@ import 'package:prasa_assist/core/auth/auth_gateway.dart';
 import 'package:prasa_assist/core/dependencies/app_dependencies_scope.dart';
 import 'package:prasa_assist/features/deployments/repositories/persistent_deployment_repository.dart';
 import 'package:prasa_assist/features/deployments/service_deployment_page.dart';
+import 'package:prasa_assist/features/incidents/incident_module.dart';
 
 import '../support/fake_auth_gateway.dart';
 import '../support/test_dependencies.dart';
@@ -18,7 +19,6 @@ void main() {
     'AI Recommendations',
   ];
   const placeholderModuleNames = [
-    'Incident Management',
     'Maintenance Work Orders',
     'AI Recommendations',
   ];
@@ -40,6 +40,84 @@ void main() {
       );
       expect(moduleEntry, findsOneWidget);
     }
+  });
+
+  testWidgets('navigates from Incident Management to the Module 1 workflow', (
+    tester,
+  ) async {
+    await _pumpAuthenticatedApp(tester);
+
+    final moduleEntry = find.text('Incident Management');
+    await tester.scrollUntilVisible(
+      moduleEntry,
+      160,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(moduleEntry);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(IncidentListPage), findsOneWidget);
+    expect(find.text('Module integration pending'), findsNothing);
+  });
+
+  testWidgets('incident registry builder injects the signed-in staff label', (
+    tester,
+  ) async {
+    final gateway = FakeAuthGateway(
+      initialSession: const AuthSession(
+        userId: 'incident-staff-uuid',
+        email: 'incident.staff@example.com',
+      ),
+    );
+    addTearDown(gateway.dispose);
+    IncidentListPage? builtPage;
+    final destination = ModuleRegistry.destinations.singleWhere(
+      (destination) => destination.id == 'incidents',
+    );
+
+    await tester.pumpWidget(
+      AppDependenciesScope(
+        dependencies: createTestDependencies(gateway),
+        child: Builder(
+          builder: (context) {
+            builtPage = destination.pageBuilder(context) as IncidentListPage;
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+
+    expect(builtPage, isNotNull);
+    expect(builtPage!.repository, isA<PersistentIncidentRepository>());
+    expect(builtPage!.currentStaffId, 'incident.staff@example.com');
+  });
+
+  testWidgets('incident registry uses the auth UUID without an email', (
+    tester,
+  ) async {
+    final gateway = FakeAuthGateway(
+      initialSession: const AuthSession(userId: 'incident-staff-uuid-only'),
+    );
+    addTearDown(gateway.dispose);
+    IncidentListPage? builtPage;
+    final destination = ModuleRegistry.destinations.singleWhere(
+      (destination) => destination.id == 'incidents',
+    );
+
+    await tester.pumpWidget(
+      AppDependenciesScope(
+        dependencies: createTestDependencies(gateway),
+        child: Builder(
+          builder: (context) {
+            builtPage = destination.pageBuilder(context) as IncidentListPage;
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+
+    expect(builtPage!.currentStaffId, 'incident-staff-uuid-only');
   });
 
   for (final moduleName in placeholderModuleNames) {

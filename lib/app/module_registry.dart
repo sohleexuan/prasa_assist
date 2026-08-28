@@ -4,6 +4,7 @@ import '../core/dependencies/app_dependencies_scope.dart';
 import '../features/deployments/data/sources/supabase_deployment_remote_data_source.dart';
 import '../features/deployments/repositories/persistent_deployment_repository.dart';
 import '../features/deployments/service_deployment_page.dart';
+import '../features/incidents/incident_module.dart';
 import 'module_placeholder_page.dart';
 
 typedef ModulePageBuilder = Widget Function(BuildContext context);
@@ -32,7 +33,7 @@ abstract final class ModuleRegistry {
       title: 'Incident Management',
       description: 'Report incidents and review their operational impact.',
       icon: Icons.warning_amber_rounded,
-      pageBuilder: _buildIncidentPlaceholder,
+      pageBuilder: _buildIncidentPage,
     ),
     ModuleDestination(
       id: 'work-orders',
@@ -57,8 +58,24 @@ abstract final class ModuleRegistry {
     ),
   ]);
 
-  static Widget _buildIncidentPlaceholder(BuildContext context) {
-    return const ModulePlaceholderPage(moduleName: 'Incident Management');
+  static Widget _buildIncidentPage(BuildContext context) {
+    final dependencies = AppDependenciesScope.of(context);
+    final session = dependencies.authGateway.currentSession;
+    if (session == null) {
+      throw StateError(
+        'An authenticated staff session is required to open incidents.',
+      );
+    }
+    final email = session.email?.trim();
+    final actorIdentifier = email?.isNotEmpty == true ? email! : session.userId;
+    return IncidentListPage(
+      repository: PersistentIncidentRepository(
+        dataSource: SupabaseIncidentRemoteDataSource(
+          dependencies.supabaseClient,
+        ),
+      ),
+      currentStaffId: actorIdentifier,
+    );
   }
 
   static Widget _buildWorkOrderPlaceholder(BuildContext context) {
