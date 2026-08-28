@@ -6,15 +6,18 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
 import '../../../shared/widgets/app_section_card.dart';
 import '../controllers/deployment_controller.dart';
+import '../controllers/route_catalog_controller.dart';
 import '../models/deployment_prefill.dart';
 import '../models/deployment_status.dart';
 import '../models/service_deployment.dart';
 import '../utils/deployment_date_time_formatter.dart';
 import '../widgets/deployment_status_chip.dart';
+import '../widgets/route_catalog_selector.dart';
 
 class DeploymentFormScreen extends StatefulWidget {
   const DeploymentFormScreen({
     required this.controller,
+    required this.routeCatalogController,
     required this.currentUserId,
     this.existingDeployment,
     this.prefill,
@@ -26,6 +29,7 @@ class DeploymentFormScreen extends StatefulWidget {
   });
 
   final DeploymentController controller;
+  final RouteCatalogController routeCatalogController;
   final String currentUserId;
   final ServiceDeployment? existingDeployment;
   final DeploymentPrefill? prefill;
@@ -204,6 +208,20 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      RouteCatalogSelector(
+                        controller: widget.routeCatalogController,
+                        enabled: !_isReadOnly && !_isSubmitting,
+                        onRouteSelected: (route) {
+                          if (_isReadOnly || _isSubmitting) {
+                            return;
+                          }
+                          setState(() {
+                            _routeIdController.text = route.routeShortName;
+                            _routeNameController.text = route.routeLongName;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
                       TextFormField(
                         key: const ValueKey('route-id-field'),
                         controller: _routeIdController,
@@ -211,10 +229,7 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
                         textInputAction: TextInputAction.next,
                         decoration: InputDecoration(
                           labelText: 'Route ID',
-                          helperText:
-                              widget.controller.capabilities.isPersistent
-                              ? 'Manual entry — not connected to GTFS route data'
-                              : 'Prototype entry — not connected to GTFS route data',
+                          helperText: 'Enter manually or select above',
                           prefixIcon: const Icon(Icons.signpost_outlined),
                         ),
                         validator: (value) =>

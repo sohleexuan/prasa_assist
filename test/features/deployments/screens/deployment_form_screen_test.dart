@@ -4,10 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prasa_assist/core/theme/app_theme.dart';
 import 'package:prasa_assist/features/deployments/controllers/deployment_controller.dart';
+import 'package:prasa_assist/features/deployments/controllers/route_catalog_controller.dart';
 import 'package:prasa_assist/features/deployments/models/deployment_prefill.dart';
 import 'package:prasa_assist/features/deployments/models/deployment_status.dart';
+import 'package:prasa_assist/features/deployments/models/route_catalog.dart';
 import 'package:prasa_assist/features/deployments/models/service_deployment.dart';
+import 'package:prasa_assist/features/deployments/repositories/bundled_route_catalog_repository.dart';
 import 'package:prasa_assist/features/deployments/repositories/in_memory_deployment_repository.dart';
+import 'package:prasa_assist/features/deployments/repositories/route_catalog_repository.dart';
 import 'package:prasa_assist/features/deployments/screens/deployment_form_screen.dart';
 
 void main() {
@@ -326,6 +330,126 @@ void main() {
     });
   });
 
+  group('Route catalogue', () {
+    testWidgets(
+      'explicit Route 300 selection copies public route fields only',
+      (tester) async {
+        ServiceDeployment? savedDeployment;
+        await _pumpForm(
+          tester,
+          onSaved: (deployment) => savedDeployment = deployment,
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('vehicle-ids-field')),
+          'REPLACEMENT-BUS-01, REPLACEMENT-BUS-02',
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('purpose-field')),
+          'Staff-confirmed replacement service',
+        );
+
+        await _selectRoute300(tester);
+
+        expect(_fieldText(tester, 'route-id-field'), '300');
+        expect(find.text('Enter manually or select above'), findsOneWidget);
+        expect(
+          find.text('Enter manually or select a cached government route above'),
+          findsNothing,
+        );
+        expect(find.textContaining('not connected to GTFS'), findsNothing);
+        expect(
+          _fieldText(tester, 'route-name-field'),
+          'Terminal Maluri ~ Lebuh Ampang',
+        );
+        expect(_fieldText(tester, 'route-id-field'), isNot('U3000'));
+        expect(
+          _fieldText(tester, 'vehicle-ids-field'),
+          'REPLACEMENT-BUS-01, REPLACEMENT-BUS-02',
+        );
+
+        await _submit(tester, 'save-draft-button');
+
+        expect(savedDeployment!.routeId, '300');
+        expect(savedDeployment!.routeName, 'Terminal Maluri ~ Lebuh Ampang');
+        expect(savedDeployment!.vehicleIds, [
+          'REPLACEMENT-BUS-01',
+          'REPLACEMENT-BUS-02',
+        ]);
+        expect(savedDeployment!.vehicleIds, isNot(contains('B1023')));
+      },
+    );
+
+    testWidgets('prefilled values survive loading, searching, and clearing', (
+      tester,
+    ) async {
+      await _pumpForm(
+        tester,
+        prefill: DeploymentPrefill(
+          routeId: 'PREFILLED-ROUTE',
+          routeName: 'Staff-reviewed prefilled route',
+        ),
+      );
+
+      expect(_fieldText(tester, 'route-id-field'), 'PREFILLED-ROUTE');
+      expect(
+        _fieldText(tester, 'route-name-field'),
+        'Staff-reviewed prefilled route',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('route-catalog-search-field')),
+        '300',
+      );
+      await tester.pump();
+      await _tapVisible(tester, const ValueKey('clear-route-catalog-search'));
+
+      expect(_fieldText(tester, 'route-id-field'), 'PREFILLED-ROUTE');
+      expect(
+        _fieldText(tester, 'route-name-field'),
+        'Staff-reviewed prefilled route',
+      );
+    });
+
+    testWidgets('existing edit values are not replaced when catalogue loads', (
+      tester,
+    ) async {
+      final existing = _existingDeployment(
+        routeName: 'Saved operational route snapshot',
+      );
+      await _pumpForm(tester, existingDeployment: existing);
+
+      expect(_fieldText(tester, 'route-id-field'), '300');
+      expect(
+        _fieldText(tester, 'route-name-field'),
+        'Saved operational route snapshot',
+      );
+      expect(find.text('Cached government static data'), findsOneWidget);
+    });
+
+    testWidgets('catalogue failure preserves manual validation and saving', (
+      tester,
+    ) async {
+      ServiceDeployment? savedDeployment;
+      await _pumpForm(
+        tester,
+        routeCatalogRepository: _UnavailableRouteCatalogRepository(),
+        onSaved: (deployment) => savedDeployment = deployment,
+      );
+      expect(
+        find.textContaining(
+          'Manual or prefilled route entry remains available',
+        ),
+        findsOneWidget,
+      );
+
+      await _fillRequiredFields(tester);
+      await _submit(tester, 'save-draft-button');
+
+      expect(savedDeployment, isNotNull);
+      expect(savedDeployment!.routeId, '300');
+      expect(savedDeployment!.vehicleIds, isNot(contains('B1023')));
+    });
+  });
+
   group('Edit mode', () {
     testWidgets('populates every existing value', (tester) async {
       final existing = _existingDeployment();
@@ -564,6 +688,7 @@ Future<_FormHarness> _pumpForm(
   DeploymentPrefill? prefill,
   InMemoryDeploymentRepository? repository,
   DeploymentController? controller,
+  RouteCatalogRepository? routeCatalogRepository,
   ValueChanged<ServiceDeployment>? onSaved,
   VoidCallback? onCancel,
   String Function()? deploymentIdGenerator,
@@ -579,6 +704,11 @@ Future<_FormHarness> _pumpForm(
         repository: effectiveRepository,
         clock: () => _controllerNow,
       );
+  final routeCatalogController = RouteCatalogController(
+    routeCatalogRepository ?? const BundledRouteCatalogRepository(),
+  );
+  await routeCatalogController.loadCatalog();
+  addTearDown(routeCatalogController.dispose);
 
   await tester.pumpWidget(
     MaterialApp(
@@ -586,6 +716,7 @@ Future<_FormHarness> _pumpForm(
       home: DeploymentFormScreen(
         key: UniqueKey(),
         controller: effectiveController,
+        routeCatalogController: routeCatalogController,
         currentUserId: currentUserId,
         existingDeployment: existingDeployment,
         prefill: prefill,
@@ -601,6 +732,15 @@ Future<_FormHarness> _pumpForm(
     repository: effectiveRepository,
     controller: effectiveController,
   );
+}
+
+Future<void> _selectRoute300(WidgetTester tester) async {
+  await tester.enterText(
+    find.byKey(const ValueKey('route-catalog-search-field')),
+    'U3000',
+  );
+  await tester.pump();
+  await _tapVisible(tester, const ValueKey('route-catalog-result-U3000'));
 }
 
 Future<void> _fillRequiredFields(
@@ -738,6 +878,13 @@ class _DelayedCreateRepository extends InMemoryDeploymentRepository {
 
   void completeCreate() {
     _createCompleter.complete();
+  }
+}
+
+class _UnavailableRouteCatalogRepository implements RouteCatalogRepository {
+  @override
+  Future<RouteCatalogSnapshot> loadCatalog() {
+    throw StateError('Route catalogue unavailable for test');
   }
 }
 

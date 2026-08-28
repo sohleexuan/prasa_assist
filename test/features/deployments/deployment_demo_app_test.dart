@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prasa_assist/core/theme/app_theme.dart';
+import 'package:prasa_assist/features/deployments/data/snapshots/rapid_bus_kl_route_snapshot.dart';
+import 'package:prasa_assist/features/deployments/models/route_catalog.dart';
+import 'package:prasa_assist/features/deployments/repositories/route_catalog_repository.dart';
 import 'package:prasa_assist/features/deployments/screens/deployment_detail_screen.dart';
 import 'package:prasa_assist/features/deployments/screens/deployment_form_screen.dart';
 import 'package:prasa_assist/features/deployments/screens/deployment_list_screen.dart';
@@ -291,13 +294,18 @@ void main() {
 
 final _testClock = DateTime(2026, 8, 27, 12);
 
-Future<void> _pumpDemo(WidgetTester tester) async {
+Future<void> _pumpDemo(
+  WidgetTester tester, {
+  RouteCatalogRepository? routeCatalogRepository,
+}) async {
   await tester.pumpWidget(
     MaterialApp(
       title: 'PrasaAssist \u2014 Service Deployment',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       home: ServiceDeploymentPage(
+        routeCatalogRepository:
+            routeCatalogRepository ?? _FakeRouteCatalogRepository(),
         clock: () => _testClock,
         deploymentIdGenerator: (sequence) =>
             'DEP-TEST-${sequence.toString().padLeft(3, '0')}',
@@ -306,6 +314,13 @@ Future<void> _pumpDemo(WidgetTester tester) async {
   );
   await tester.pump();
   await tester.pump();
+}
+
+class _FakeRouteCatalogRepository implements RouteCatalogRepository {
+  @override
+  Future<RouteCatalogSnapshot> loadCatalog() async {
+    return rapidBusKlRouteSnapshot;
+  }
 }
 
 Future<void> _openCreate(WidgetTester tester) async {
