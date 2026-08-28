@@ -1374,6 +1374,50 @@ keys, or private configuration values were recorded.
   migration itself was applied successfully through the SQL Editor and its
   app-level CRUD/restart path was verified on Android.
 
+## Record YQ-023 — Module 1 SQLite hybrid persistence
+
+Date: 2026-08-29
+Completion time: 01:06:59 (Asia/Kuala_Lumpur, UTC+08:00)
+Status: Completed
+
+### Purpose and important prompt
+
+Implement Module 1's owner-scoped SQLite cache and unpublished Incident
+drafts on the shared `AppDatabase` schema migration v3. Supabase remains the
+authoritative store; offline use must never misrepresent cached data as live.
+
+### AI-generated or suggested output
+
+- Added the Module 1 v3 schema design, local source, Supabase-first hybrid
+  repository, local draft workflow, and UI provenance indicators.
+- Added migration, UUID owner-isolation, offline fallback, cache-refresh, and
+  failure-handling tests for review.
+
+### Leong's review or manual changes
+
+Leong approved autonomous completion through Part 7, with interruptions only
+for a shared decision, dependency, Git operation, or material safety issue.
+
+### Verification
+
+- `flutter analyze`: no issues found.
+- `flutter test`: 532 tests passed.
+- Leong launched the Android App and opened Incident Management successfully
+  after the v3 SQLite integration; no red screen or crash occurred.
+- `git diff --check` completed without whitespace errors.
+- A direct source scan confirmed Incident UI pages and controllers do not
+  import `sqflite` or `sqflite_common_ffi`.
+- The initial Dart telemetry permission problem was repaired manually by
+  Leong. Codex did not change Windows configuration; Leong then ran the final
+  analysis and complete test suite successfully in the project terminal.
+
+### Rejected suggestions, issues, and limitations
+
+- No new dependency, Supabase schema/RLS change, service-role credential, or
+  change to Modules 2, 3, or 4 is included.
+- A local draft is never automatically submitted; staff must explicitly submit
+  it, and conflict/failure states require review.
+
 ## Template for the next record
 
 ### Record YQ-XXX — Activity title

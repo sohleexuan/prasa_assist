@@ -5,6 +5,7 @@ import '../../../shared/widgets/app_page_scaffold.dart';
 import '../../../shared/widgets/app_section_card.dart';
 import '../../../shared/widgets/app_status_chip.dart';
 import '../controllers/incident_controller.dart';
+import '../data/dto/local_incident_draft.dart';
 import '../models/delay_estimate.dart';
 import '../models/incident.dart';
 import '../models/incident_enums.dart';
@@ -450,6 +451,18 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
                       _isEditMode ? 'Save Changes' : 'Save Incident Report',
                     ),
                   ),
+                  if (!_isEditMode &&
+                      widget.controller.supportsLocalDrafts) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    OutlinedButton.icon(
+                      key: const ValueKey('save-local-incident-draft-button'),
+                      onPressed: _isSubmitting
+                          ? null
+                          : () => _submit(localDraft: true),
+                      icon: const Icon(Icons.save_as_outlined),
+                      label: const Text('Save Local Draft'),
+                    ),
+                  ],
                   const SizedBox(height: AppSpacing.sm),
                 ],
                 TextButton(
@@ -465,7 +478,7 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
     );
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit({bool localDraft = false}) async {
     if (_isSubmitting || _isReadOnly) {
       return;
     }
@@ -526,7 +539,11 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
             delayEstimate: _preview,
           );
     final succeeded = existing == null
-        ? await widget.controller.createIncident(incident)
+        ? localDraft
+              ? await widget.controller.createLocalDraft(
+                  LocalIncidentDraft(incident),
+                )
+              : await widget.controller.createIncident(incident)
         : await widget.controller.updateIncident(incident);
     if (!mounted) {
       return;
@@ -536,14 +553,20 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
       _submissionError = succeeded
           ? null
           : widget.controller.errorMessage ??
-                (_isEditMode
+                (localDraft
+                    ? 'Unable to save the local Incident draft.'
+                    : _isEditMode
                     ? 'Unable to save Incident changes.'
                     : 'Unable to save the incident report.');
     });
     if (succeeded) {
-      final savedIncident = widget.controller.selectedIncident;
-      if (savedIncident != null) {
-        widget.onSaved?.call(savedIncident);
+      if (localDraft) {
+        widget.onCancel?.call();
+      } else {
+        final savedIncident = widget.controller.selectedIncident;
+        if (savedIncident != null) {
+          widget.onSaved?.call(savedIncident);
+        }
       }
     }
   }

@@ -6,6 +6,9 @@ import '../models/incident_query.dart';
 import '../repositories/incident_data_exception.dart';
 import '../repositories/incident_repository.dart';
 import '../repositories/incident_repository_capabilities.dart';
+import '../repositories/incident_hybrid_operations.dart';
+import '../data/dto/local_incident_draft.dart';
+import '../models/local_incident_work_item.dart';
 import 'incident_state.dart';
 
 class IncidentController extends ChangeNotifier {
@@ -30,6 +33,8 @@ class IncidentController extends ChangeNotifier {
   bool get isLoading => _state.isLoading;
 
   String? get errorMessage => _state.errorMessage;
+  List<LocalIncidentWorkItem> get localWorkItems => _state.localWorkItems;
+  bool get supportsLocalDrafts => _repository is IncidentHybridOperations;
 
   IncidentRepositoryCapabilities get capabilities =>
       incidentCapabilitiesOf(_repository);
@@ -45,11 +50,32 @@ class IncidentController extends ChangeNotifier {
     );
 
     try {
-      final incidents = await _repository.getAll(query: effectiveQuery);
+      final hybrid = _repository is IncidentHybridOperations
+          ? _repository as IncidentHybridOperations
+          : null;
+      final result = hybrid == null
+          ? null
+          : await hybrid.getAllWithProvenance(query: effectiveQuery);
+      final incidents =
+          result?.data ?? await _repository.getAll(query: effectiveQuery);
       if (!_isCurrent(revision)) {
         return;
       }
-      _emitList(incidents, query: effectiveQuery);
+      List<LocalIncidentWorkItem> localWorkItems = const [];
+      if (hybrid != null) {
+        try {
+          localWorkItems = await hybrid.getLocalWorkItems();
+        } catch (_) {
+          // A valid authoritative or cached read remains usable if only the
+          // optional local-draft list cannot be loaded.
+        }
+      }
+      _emitList(
+        incidents,
+        query: effectiveQuery,
+        listProvenance: result?.provenance,
+        localWorkItems: localWorkItems,
+      );
     } catch (error) {
       if (_isCurrent(revision)) {
         _emitError(error);
@@ -100,6 +126,51 @@ class IncidentController extends ChangeNotifier {
       final created = await _repository.create(incident);
       return created;
     });
+  }
+
+  Future<bool> createLocalDraft(LocalIncidentDraft draft) async {
+    final hybrid = _repository is IncidentHybridOperations
+        ? _repository as IncidentHybridOperations
+        : null;
+    if (hybrid == null) return false;
+    try {
+      await hybrid.createLocalDraft(draft);
+      await loadIncidents();
+      return true;
+    } catch (error) {
+      _emitError(error);
+      return false;
+    }
+  }
+
+  Future<bool> publishLocalDraft(String localId) async {
+    final hybrid = _repository is IncidentHybridOperations
+        ? _repository as IncidentHybridOperations
+        : null;
+    if (hybrid == null) return false;
+    try {
+      await hybrid.publishLocalDraft(localId);
+      await loadIncidents();
+      return true;
+    } catch (error) {
+      _emitError(error);
+      return false;
+    }
+  }
+
+  Future<bool> discardLocalDraft(String localId) async {
+    final hybrid = _repository is IncidentHybridOperations
+        ? _repository as IncidentHybridOperations
+        : null;
+    if (hybrid == null) return false;
+    try {
+      await hybrid.discardLocalDraft(localId);
+      await loadIncidents();
+      return true;
+    } catch (error) {
+      _emitError(error);
+      return false;
+    }
   }
 
   Future<bool> updateIncident(Incident incident) {
@@ -207,6 +278,8 @@ class IncidentController extends ChangeNotifier {
     List<Incident> incidents, {
     IncidentQuery? query,
     Object? selectedIncident = _selectionNotProvided,
+    Object? listProvenance = _selectionNotProvided,
+    List<LocalIncidentWorkItem>? localWorkItems,
   }) {
     _emit(
       _state.copyWith(
@@ -217,6 +290,10 @@ class IncidentController extends ChangeNotifier {
             ? _state.selectedIncident
             : selectedIncident,
         errorMessage: null,
+        listProvenance: identical(listProvenance, _selectionNotProvided)
+            ? _state.listProvenance
+            : listProvenance,
+        localWorkItems: localWorkItems,
       ),
     );
   }

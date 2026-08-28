@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../repositories/incident_data_exception.dart';
 import '../dto/incident_record_dto.dart';
 import 'incident_remote_data_source.dart';
+import 'src/incident_transport_classifier.dart';
 
 abstract interface class IncidentSupabaseGateway {
   Future<Object?> fetchAllIncidentRows();
@@ -190,8 +191,14 @@ class SupabaseIncidentRemoteDataSource implements IncidentRemoteDataSource {
         cause: error,
       );
     } catch (error) {
-      throw IncidentOfflineException(
-        'Incident data is unavailable. Check the connection and try again.',
+      if (isIncidentTransportFailure(error)) {
+        throw IncidentOfflineException(
+          'Incident data is unavailable. Check the connection and try again.',
+          cause: error,
+        );
+      }
+      throw IncidentUnknownDataException(
+        'Unable to complete the incident data operation.',
         cause: error,
       );
     }

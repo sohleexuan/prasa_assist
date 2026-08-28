@@ -3,17 +3,27 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/app_section_card.dart';
 import '../../../shared/widgets/app_status_chip.dart';
+import '../models/incident_read_result.dart';
 
 class IncidentDataNotice extends StatelessWidget {
-  const IncidentDataNotice({required this.isPersistent, super.key});
+  const IncidentDataNotice({
+    required this.isPersistent,
+    this.provenance,
+    super.key,
+  });
 
   final bool isPersistent;
+  final IncidentReadProvenance? provenance;
 
   @override
   Widget build(BuildContext context) {
     return AppSectionCard(
       title: isPersistent ? 'Shared Incident Data' : 'Module 1 Prototype',
-      subtitle: isPersistent
+      subtitle: provenance?.isCached == true
+          ? 'Showing owner-scoped SQLite cache saved at '
+                '${provenance!.retrievedAtUtc.toLocal()}. Supabase is '
+                'currently unreachable.'
+          : isPersistent
           ? 'Supabase-backed staff records persist across app restarts. '
                 'They remain decision-support records and do not control '
                 'live operations.'
@@ -27,7 +37,9 @@ class IncidentDataNotice extends StatelessWidget {
         runSpacing: AppSpacing.xs,
         children: [
           AppStatusChip(
-            label: isPersistent
+            label: provenance?.isCached == true
+                ? 'Cached / Offline Data'
+                : isPersistent
                 ? 'Persistent / Shared Data'
                 : 'Mock / Demonstration Data',
             tone: isPersistent

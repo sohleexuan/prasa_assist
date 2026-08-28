@@ -2,16 +2,19 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/database/local_sync_state.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/app_empty_state.dart';
 import '../../../shared/widgets/app_error_state.dart';
 import '../../../shared/widgets/app_loading_indicator.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
+import '../../../shared/widgets/app_section_card.dart';
 import '../controllers/incident_controller.dart';
 import '../controllers/incident_state.dart';
 import '../models/incident.dart';
 import '../models/incident_enums.dart';
 import '../models/incident_query.dart';
+import '../models/local_incident_work_item.dart';
 import '../repositories/in_memory_incident_repository.dart';
 import '../repositories/incident_repository.dart';
 import '../services/incident_report_factory.dart';
@@ -121,9 +124,23 @@ class _IncidentListPageState extends State<IncidentListPage> {
             sliver: SliverToBoxAdapter(
               child: IncidentDataNotice(
                 isPersistent: _controller.capabilities.isPersistent,
+                provenance: state.listProvenance,
               ),
             ),
           ),
+          if (state.localWorkItems.isNotEmpty)
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              sliver: SliverToBoxAdapter(
+                child: _LocalDraftSection(
+                  items: state.localWorkItems,
+                  onSubmit: (item) =>
+                      unawaited(_controller.publishLocalDraft(item.localId)),
+                  onDiscard: (item) =>
+                      unawaited(_controller.discardLocalDraft(item.localId)),
+                ),
+              ),
+            ),
           SliverFillRemaining(
             hasScrollBody: false,
             child: AppEmptyState(
@@ -155,8 +172,19 @@ class _IncidentListPageState extends State<IncidentListPage> {
             children: [
               IncidentDataNotice(
                 isPersistent: _controller.capabilities.isPersistent,
+                provenance: state.listProvenance,
               ),
               const SizedBox(height: AppSpacing.md),
+              if (state.localWorkItems.isNotEmpty) ...[
+                _LocalDraftSection(
+                  items: state.localWorkItems,
+                  onSubmit: (item) =>
+                      unawaited(_controller.publishLocalDraft(item.localId)),
+                  onDiscard: (item) =>
+                      unawaited(_controller.discardLocalDraft(item.localId)),
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
               _ResultSummary(count: state.incidents.length),
               const SizedBox(height: AppSpacing.md),
               TextField(
@@ -386,6 +414,54 @@ class _IncidentListPageState extends State<IncidentListPage> {
 
   static T? _singleValue<T>(Set<T> values) {
     return values.length == 1 ? values.single : null;
+  }
+}
+
+class _LocalDraftSection extends StatelessWidget {
+  const _LocalDraftSection({
+    required this.items,
+    required this.onSubmit,
+    required this.onDiscard,
+  });
+
+  final List<LocalIncidentWorkItem> items;
+  final ValueChanged<LocalIncidentWorkItem> onSubmit;
+  final ValueChanged<LocalIncidentWorkItem> onDiscard;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSectionCard(
+      title: 'Local drafts',
+      subtitle: 'Not submitted to Supabase. Staff must review and submit each report explicitly.',
+      leading: const Icon(Icons.edit_note_outlined),
+      body: Column(
+        children: [
+          for (final item in items)
+            ListTile(
+              title: Text(item.incident.title),
+              subtitle: Text(
+                item.safeErrorMessage == null
+                    ? 'Draft only · ${item.syncState.storageValue}'
+                    : item.safeErrorMessage!,
+              ),
+              trailing: Wrap(
+                spacing: AppSpacing.xs,
+                children: [
+                  if (item.syncState != LocalSyncState.conflict)
+                    FilledButton(
+                      onPressed: () => onSubmit(item),
+                      child: const Text('Submit'),
+                    ),
+                  TextButton(
+                    onPressed: () => onDiscard(item),
+                    child: const Text('Discard'),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 

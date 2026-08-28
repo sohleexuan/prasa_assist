@@ -66,7 +66,7 @@ void main() {
   ) async {
     final gateway = FakeAuthGateway(
       initialSession: const AuthSession(
-        userId: 'incident-staff-uuid',
+        userId: '00000000-0000-4000-8000-000000000010',
         email: 'incident.staff@example.com',
       ),
     );
@@ -89,7 +89,7 @@ void main() {
     );
 
     expect(builtPage, isNotNull);
-    expect(builtPage!.repository, isA<PersistentIncidentRepository>());
+    expect(builtPage!.repository, isA<HybridIncidentRepository>());
     expect(builtPage!.currentStaffId, 'incident.staff@example.com');
   });
 
@@ -97,7 +97,9 @@ void main() {
     tester,
   ) async {
     final gateway = FakeAuthGateway(
-      initialSession: const AuthSession(userId: 'incident-staff-uuid-only'),
+      initialSession: const AuthSession(
+        userId: '00000000-0000-4000-8000-000000000011',
+      ),
     );
     addTearDown(gateway.dispose);
     IncidentListPage? builtPage;
@@ -117,7 +119,7 @@ void main() {
       ),
     );
 
-    expect(builtPage!.currentStaffId, 'incident-staff-uuid-only');
+    expect(builtPage!.currentStaffId, '00000000-0000-4000-8000-000000000011');
   });
 
   for (final moduleName in placeholderModuleNames) {
@@ -237,7 +239,9 @@ void main() {
 
 Future<void> _pumpAuthenticatedApp(WidgetTester tester) async {
   final gateway = FakeAuthGateway(
-    initialSession: const AuthSession(userId: 'staff-1'),
+    initialSession: const AuthSession(
+      userId: '00000000-0000-4000-8000-000000000012',
+    ),
   );
   addTearDown(gateway.dispose);
   await tester.pumpWidget(
