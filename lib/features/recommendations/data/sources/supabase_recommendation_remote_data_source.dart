@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../repositories/recommendation_data_exception.dart';
+import '../recommendation_serialization.dart';
 import '../dto/recommendation_record_dto.dart';
 import 'recommendation_remote_data_source.dart';
 
@@ -29,6 +30,47 @@ class SupabaseRecommendationRemoteDataSource
         .eq('id', id.trim())
         .maybeSingle();
     return row == null ? null : RecommendationRecordDto.fromMap(row);
+  });
+
+  @override
+  Future<RecommendationRecordDto> createPending(
+    RecommendationRecordDto record,
+  ) => _guard(() async {
+    final existing = await fetchById(record.recommendation.id);
+    if (existing != null) return existing;
+    final recommendation = record.recommendation;
+    try {
+      final row = await _client
+          .from('recommendations')
+          .insert({
+            'id': recommendation.id,
+            'owner_user_id': recommendation.ownerUserId,
+            'incident_id': recommendation.incidentId,
+            'vehicle_id': recommendation.vehicleId,
+            'route_id': recommendation.routeId,
+            'actions_snapshot': RecommendationSerialization.encodeActions(
+              recommendation.actions,
+            ),
+            'evidence_snapshot': RecommendationSerialization.encodeEvidence(
+              recommendation.evidence,
+            ),
+            'score': recommendation.score,
+            'confidence_details': RecommendationSerialization.encodeConfidence(
+              recommendation.confidenceDetails,
+            ),
+            'status': 'pending_review',
+            'created_at': recommendation.createdAt.toIso8601String(),
+            'updated_at': recommendation.updatedAt.toIso8601String(),
+          })
+          .select(_selection)
+          .single();
+      return RecommendationRecordDto.fromMap(row);
+    } on PostgrestException catch (error) {
+      if (error.code != '23505') rethrow;
+      final reused = await fetchById(recommendation.id);
+      if (reused != null) return reused;
+      rethrow;
+    }
   });
 
   @override

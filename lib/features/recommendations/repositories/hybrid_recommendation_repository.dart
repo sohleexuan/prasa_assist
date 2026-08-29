@@ -44,6 +44,15 @@ class HybridRecommendationRepository implements RecommendationRepository {
   }
 
   @override
+  Future<RecommendationRecordDto> createPending(
+    RecommendationRecordDto record,
+  ) async {
+    final authoritative = await _remote.createPending(record);
+    await _local.replaceAll([authoritative], retrievedAt: _clock().toUtc());
+    return authoritative;
+  }
+
+  @override
   Future<RecommendationRecordDto> decide(
     String id, {
     required String decision,

@@ -81,6 +81,26 @@ class OperationsRecommendation {
 
   double get confidence => confidenceDetails.finalConfidence;
 
+  OperationsRecommendation copyWithOwner(String ownerUserId) =>
+      OperationsRecommendation(
+        id: id,
+        incidentId: incidentId,
+        vehicleId: vehicleId,
+        routeId: routeId,
+        actions: actions,
+        evidence: evidence,
+        status: status,
+        score: score,
+        confidenceDetails: confidenceDetails,
+        createdAt: createdAt,
+        ownerUserId: ownerUserId,
+        decisionUserId: decisionUserId,
+        decisionAt: decisionAt,
+        decisionNote: decisionNote,
+        remoteVersion: remoteVersion,
+        updatedAt: updatedAt,
+      );
+
   final DateTime createdAt;
   final String? ownerUserId;
   final String? decisionUserId;
