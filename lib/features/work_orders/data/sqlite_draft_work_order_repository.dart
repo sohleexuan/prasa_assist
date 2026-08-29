@@ -40,11 +40,7 @@ class SqliteDraftWorkOrderRepository implements WorkOrderRepository {
   @override
   Future<List<WorkOrder>> readAll() async {
     final local = await _localDataSource.readLocalWorkItems();
-    final confirmed = await _localDataSource.readConfirmedCacheRecords();
-    return List.unmodifiable([
-      ...local.map(_toDomain),
-      ...confirmed.map(_toDomain),
-    ]);
+    return List.unmodifiable(local.map(_toDomain));
   }
 
   @override

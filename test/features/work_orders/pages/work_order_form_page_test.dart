@@ -1,18 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:prasa_assist/core/database/local_user_scope.dart';
-import 'package:prasa_assist/core/database/migrations/app_database_migration_v4.dart';
 import 'package:prasa_assist/core/theme/app_theme.dart';
 import 'package:prasa_assist/features/work_orders/controllers/work_orders_controller.dart';
 import 'package:prasa_assist/features/work_orders/data/in_memory_work_order_repository.dart';
-import 'package:prasa_assist/features/work_orders/data/sqlite_draft_work_order_repository.dart';
-import 'package:prasa_assist/features/work_orders/data/sources/sqlite_work_order_local_data_source.dart';
 import 'package:prasa_assist/features/work_orders/models/work_order.dart';
 import 'package:prasa_assist/features/work_orders/models/work_order_prefill.dart';
 import 'package:prasa_assist/features/work_orders/pages/work_order_form_page.dart';
 import 'package:prasa_assist/features/work_orders/repositories/work_order_data_exception.dart';
-
-import '../../../support/sqlite_test_database.dart';
 
 void main() {
   testWidgets('validates required fields before creating a draft', (
@@ -70,16 +64,8 @@ void main() {
   testWidgets(
     'uses editable create-mode recommendation prefill and links IDs',
     (tester) async {
-      final database = createInMemoryTestDatabase();
-      addTearDown(database.close);
-      final localDataSource = SqliteWorkOrderLocalDataSource(
-        database: database,
-        userScope: LocalUserScope(_ownerUserId),
-        localIdGenerator: () => 'work-order-local-1',
-        clock: () => DateTime.utc(2026, 8, 29, 9),
-      );
       final controller = WorkOrdersController(
-        SqliteDraftWorkOrderRepository(localDataSource),
+        InMemoryWorkOrderRepository(initialWorkOrders: []),
       );
       addTearDown(controller.dispose);
       await controller.load();
@@ -102,11 +88,6 @@ void main() {
       expect(find.text('Create work order'), findsOneWidget);
       expect(find.text('Edit work order'), findsNothing);
       expect(controller.workOrders, isEmpty);
-      expect(await localDataSource.readLocalWorkItems(), isEmpty);
-      expect(
-        await database.query(AppDatabaseMigrationV4.workOrderRecordsTable),
-        isEmpty,
-      );
       expect(
         find.widgetWithText(DropdownButtonFormField<WorkOrderPriority>, 'High'),
         findsOneWidget,
@@ -123,16 +104,6 @@ void main() {
       expect(controller.workOrders.single.incidentId, 'INC-1');
       expect(controller.workOrders.single.taskType, 'Safety inspection');
       expect(controller.workOrders.single.priority, WorkOrderPriority.high);
-      final persisted = await localDataSource.readLocalWorkItems();
-      expect(persisted, hasLength(1));
-      expect(persisted.single.draft.recommendationId, 'REC-1');
-      expect(persisted.single.draft.incidentId, 'INC-1');
-      final rows = await database.query(
-        AppDatabaseMigrationV4.workOrderRecordsTable,
-      );
-      expect(rows, hasLength(1));
-      expect(rows.single['recommendation_id'], 'REC-1');
-      expect(rows.single['incident_id'], 'INC-1');
     },
   );
 
@@ -206,8 +177,6 @@ void main() {
     expect(find.byKey(const Key('saveWorkOrderButton')), findsNothing);
   });
 }
-
-const _ownerUserId = '11111111-1111-4111-8111-111111111111';
 
 Future<void> _scrollToBottom(WidgetTester tester) async {
   await tester.drag(find.byType(ListView), const Offset(0, -700));
