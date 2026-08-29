@@ -1,10 +1,14 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prasa_assist/app/module_registry.dart';
 import 'package:prasa_assist/app/prasa_assist_app.dart';
 import 'package:prasa_assist/core/auth/auth_gateway.dart';
+import 'package:prasa_assist/core/database/app_database.dart';
+import 'package:prasa_assist/core/dependencies/app_dependencies.dart';
 import 'package:prasa_assist/core/dependencies/app_dependencies_scope.dart';
+import 'package:prasa_assist/features/deployments/models/deployment_prefill.dart';
 import 'package:prasa_assist/features/deployments/repositories/hybrid_deployment_repository.dart';
+import 'package:prasa_assist/features/deployments/screens/deployment_form_screen.dart';
 import 'package:prasa_assist/features/deployments/service_deployment_page.dart';
 import 'package:prasa_assist/features/incidents/incident_module.dart';
 import 'package:prasa_assist/features/recommendations/pages/recommendation_list_page.dart';
@@ -163,6 +167,91 @@ void main() {
   });
 
   testWidgets(
+    'recommendation callback opens an unsaved deployment create prefill',
+    (tester) async {
+      final gateway = FakeAuthGateway(
+        initialSession: const AuthSession(
+          userId: '33333333-3333-4333-8333-333333333333',
+          email: 'deployment.staff@example.com',
+        ),
+      );
+      final database = _RecordingAppDatabase();
+      addTearDown(gateway.dispose);
+      addTearDown(database.close);
+      final dependencies = AppDependencies(
+        supabaseClient: createTestDependencies(gateway).supabaseClient,
+        authGateway: gateway,
+        appDatabase: database,
+      );
+      const prefill = DeploymentPrefill(
+        incidentId: 'INC-B1023-300',
+        recommendationId: 'REC-B1023-300',
+        routeId: '300',
+        suggestedVehicleCount: 2,
+        suggestedPurpose:
+            'Provide 2 replacement buses for Route 300. '
+            'Staff must review and save the draft.',
+      );
+      RecommendationListPage? recommendationPage;
+      final destination = ModuleRegistry.destinations.singleWhere(
+        (destination) => destination.id == 'recommendations',
+      );
+
+      await tester.pumpWidget(
+        AppDependenciesScope(
+          dependencies: dependencies,
+          child: MaterialApp(
+            home: Builder(
+              builder: (context) {
+                recommendationPage =
+                    destination.pageBuilder(context) as RecommendationListPage;
+                return ElevatedButton(
+                  onPressed: () async {
+                    await recommendationPage!.onPrepareServiceDeployment!(
+                      prefill,
+                    );
+                  },
+                  child: const Text('Open deployment prefill'),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      expect(recommendationPage!.onPrepareServiceDeployment, isNotNull);
+      await tester.tap(find.text('Open deployment prefill'));
+      await tester.pumpAndSettle();
+
+      final deploymentPage = tester.widget<ServiceDeploymentPage>(
+        find.byType(ServiceDeploymentPage, skipOffstage: false),
+      );
+      expect(deploymentPage.repository, isA<HybridDeploymentRepository>());
+      expect(deploymentPage.currentUserId, 'deployment.staff@example.com');
+      expect(deploymentPage.initialCreatePrefill, same(prefill));
+
+      expect(find.byType(DeploymentFormScreen), findsOneWidget);
+      expect(_fieldText(tester, 'incident-id-field'), 'INC-B1023-300');
+      expect(_fieldText(tester, 'recommendation-id-field'), 'REC-B1023-300');
+      expect(_fieldText(tester, 'route-id-field'), '300');
+      expect(_fieldText(tester, 'purpose-field'), prefill.suggestedPurpose);
+      expect(
+        find.text(
+          'Recommendation suggests 2 vehicles. '
+          'Staff must select the actual vehicles.',
+        ),
+        findsOneWidget,
+      );
+      expect(_fieldText(tester, 'vehicle-ids-field'), isEmpty);
+      expect(database.insertCount, 0);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
     'deployment registry builder injects Supabase persistence and auth label',
     (tester) async {
       final gateway = FakeAuthGateway(
@@ -263,4 +352,66 @@ Future<void> _pumpAuthenticatedApp(WidgetTester tester) async {
     PrasaAssistApp(dependencies: createTestDependencies(gateway)),
   );
   await tester.pump();
+}
+
+String _fieldText(WidgetTester tester, String key) {
+  return tester
+      .widget<TextFormField>(find.byKey(ValueKey(key)))
+      .controller!
+      .text;
+}
+
+class _RecordingAppDatabase implements AppDatabase {
+  int insertCount = 0;
+
+  @override
+  bool get isOpen => true;
+
+  @override
+  bool get isClosed => false;
+
+  @override
+  Future<void> ensureOpen() async {}
+
+  @override
+  Future<void> close() async {}
+
+  @override
+  Future<T> transaction<T>(
+    Future<T> Function(AppDatabaseTransaction transaction) action,
+  ) {
+    return action(_RecordingAppDatabaseTransaction(this));
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _RecordingAppDatabaseTransaction implements AppDatabaseTransaction {
+  _RecordingAppDatabaseTransaction(this.database);
+
+  final _RecordingAppDatabase database;
+
+  @override
+  Future<List<Map<String, Object?>>> query(
+    String table, {
+    List<String>? columns,
+    String? where,
+    List<Object?>? whereArgs,
+    String? orderBy,
+    int? limit,
+  }) async => const [];
+
+  @override
+  Future<int> insert(
+    String table,
+    Map<String, Object?> values, {
+    dynamic conflictAlgorithm,
+  }) async {
+    database.insertCount++;
+    return 1;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

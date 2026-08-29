@@ -4,6 +4,7 @@ import '../core/dependencies/app_dependencies_scope.dart';
 import '../core/database/local_user_scope.dart';
 import '../features/deployments/data/sources/sqlite_deployment_local_data_source.dart';
 import '../features/deployments/data/sources/supabase_deployment_remote_data_source.dart';
+import '../features/deployments/models/deployment_prefill.dart';
 import '../features/deployments/repositories/hybrid_deployment_repository.dart';
 import '../features/deployments/service_deployment_page.dart';
 import '../features/incidents/incident_module.dart';
@@ -106,7 +107,10 @@ abstract final class ModuleRegistry {
     return const ModulePlaceholderPage(moduleName: 'Maintenance Work Orders');
   }
 
-  static Widget _buildDeploymentPage(BuildContext context) {
+  static Widget _buildDeploymentPage(
+    BuildContext context, {
+    DeploymentPrefill? initialCreatePrefill,
+  }) {
     final dependencies = AppDependenciesScope.of(context);
     final session = dependencies.authGateway.currentSession;
     if (session == null) {
@@ -144,6 +148,7 @@ abstract final class ModuleRegistry {
         ),
       ),
       currentUserId: actorIdentifier,
+      initialCreatePrefill: initialCreatePrefill,
     );
   }
 
@@ -181,6 +186,12 @@ abstract final class ModuleRegistry {
                   '$localIdSequence';
             },
           ),
+        ),
+      ),
+      onPrepareServiceDeployment: (prefill) => Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (context) =>
+              _buildDeploymentPage(context, initialCreatePrefill: prefill),
         ),
       ),
     );
