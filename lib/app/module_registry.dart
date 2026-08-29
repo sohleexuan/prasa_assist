@@ -14,7 +14,8 @@ import '../features/recommendations/data/sources/supabase_recommendation_remote_
 import '../features/recommendations/pages/recommendation_list_page.dart';
 import '../features/recommendations/repositories/hybrid_recommendation_repository.dart';
 import '../features/work_orders/controllers/work_orders_controller.dart';
-import '../features/work_orders/data/in_memory_work_order_repository.dart';
+import '../features/work_orders/data/sqlite_draft_work_order_repository.dart';
+import '../features/work_orders/data/sources/sqlite_work_order_local_data_source.dart';
 import 'module_placeholder_page.dart';
 
 typedef ModulePageBuilder = Widget Function(BuildContext context);
@@ -155,6 +156,7 @@ abstract final class ModuleRegistry {
       );
     }
     final userScope = LocalUserScope(session.userId);
+    var localIdSequence = 0;
     return RecommendationListPage(
       controller: RecommendationController(
         HybridRecommendationRepository(
@@ -168,7 +170,18 @@ abstract final class ModuleRegistry {
         ),
       ),
       workOrdersController: WorkOrdersController(
-        InMemoryWorkOrderRepository(initialWorkOrders: const []),
+        SqliteDraftWorkOrderRepository(
+          SqliteWorkOrderLocalDataSource(
+            database: dependencies.appDatabase,
+            userScope: userScope,
+            localIdGenerator: () {
+              localIdSequence++;
+              return 'work-order-local-'
+                  '${DateTime.now().toUtc().microsecondsSinceEpoch}-'
+                  '$localIdSequence';
+            },
+          ),
+        ),
       ),
     );
   }
