@@ -113,9 +113,9 @@ class WorkOrdersController extends ChangeNotifier {
       createdAt: now,
       updatedAt: now,
     );
-    await _repository.create(workOrder);
+    final saved = await _repository.create(workOrder);
     await load();
-    return workOrder;
+    return saved;
   }
 
   Future<WorkOrder> updateEligible({

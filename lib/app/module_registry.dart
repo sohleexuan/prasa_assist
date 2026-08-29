@@ -8,6 +8,14 @@ import '../features/deployments/repositories/hybrid_deployment_repository.dart';
 import '../features/deployments/service_deployment_page.dart';
 import '../features/incidents/incident_module.dart';
 import '../features/incidents/data/sources/sqlite_incident_local_data_source.dart';
+import '../features/recommendations/controllers/recommendation_controller.dart';
+import '../features/recommendations/data/sources/sqlite_recommendation_local_data_source.dart';
+import '../features/recommendations/data/sources/supabase_recommendation_remote_data_source.dart';
+import '../features/recommendations/pages/recommendation_list_page.dart';
+import '../features/recommendations/repositories/hybrid_recommendation_repository.dart';
+import '../features/work_orders/controllers/work_orders_controller.dart';
+import '../features/work_orders/data/sqlite_draft_work_order_repository.dart';
+import '../features/work_orders/data/sources/sqlite_work_order_local_data_source.dart';
 import 'module_placeholder_page.dart';
 
 typedef ModulePageBuilder = Widget Function(BuildContext context);
@@ -57,7 +65,7 @@ abstract final class ModuleRegistry {
       title: 'AI Recommendations',
       description: 'Review explainable guidance before staff take action.',
       icon: Icons.lightbulb_outline_rounded,
-      pageBuilder: _buildRecommendationPlaceholder,
+      pageBuilder: _buildRecommendationPage,
     ),
   ]);
 
@@ -139,7 +147,42 @@ abstract final class ModuleRegistry {
     );
   }
 
-  static Widget _buildRecommendationPlaceholder(BuildContext context) {
-    return const ModulePlaceholderPage(moduleName: 'AI Recommendations');
+  static Widget _buildRecommendationPage(BuildContext context) {
+    final dependencies = AppDependenciesScope.of(context);
+    final session = dependencies.authGateway.currentSession;
+    if (session == null) {
+      throw StateError(
+        'An authenticated staff session is required to open recommendations.',
+      );
+    }
+    final userScope = LocalUserScope(session.userId);
+    var localIdSequence = 0;
+    return RecommendationListPage(
+      controller: RecommendationController(
+        HybridRecommendationRepository(
+          remote: SupabaseRecommendationRemoteDataSource(
+            dependencies.supabaseClient,
+          ),
+          local: SqliteRecommendationLocalDataSource(
+            database: dependencies.appDatabase,
+            userScope: userScope,
+          ),
+        ),
+      ),
+      workOrdersController: WorkOrdersController(
+        SqliteDraftWorkOrderRepository(
+          SqliteWorkOrderLocalDataSource(
+            database: dependencies.appDatabase,
+            userScope: userScope,
+            localIdGenerator: () {
+              localIdSequence++;
+              return 'work-order-local-'
+                  '${DateTime.now().toUtc().microsecondsSinceEpoch}-'
+                  '$localIdSequence';
+            },
+          ),
+        ),
+      ),
+    );
   }
 }

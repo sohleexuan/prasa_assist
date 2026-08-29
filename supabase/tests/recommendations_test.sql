@@ -1,0 +1,12 @@
+begin;
+select plan(8);
+select has_table('public', 'recommendations', 'recommendations table exists');
+select has_table('public', 'recommendation_analyses', 'analysis table exists');
+select col_is_pk('public', 'recommendation_analyses', 'recommendation_id', 'one analysis per recommendation');
+select policies_are('public', 'recommendations', array['recommendations_owner_select', 'recommendations_owner_insert']);
+select policies_are('public', 'recommendation_analyses', array['recommendation_analyses_owner_select']);
+select function_returns('public', 'decide_recommendation', array['uuid','text','text','bigint'], 'public.recommendations');
+select col_has_check('public', 'recommendations', 'status', 'status is constrained');
+select col_has_check('public', 'recommendations', 'score', 'score is constrained');
+select * from finish();
+rollback;

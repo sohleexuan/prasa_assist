@@ -304,8 +304,8 @@ class SqliteWorkOrderLocalDataSource implements WorkOrderLocalDataSource {
     required List<Object?> whereArgs,
     String? orderBy,
     int? limit,
-  }) => _database.transaction((transaction) async {
-    final rows = await transaction.query(
+  }) async {
+    final rows = await _database.query(
       _table,
       where: where,
       whereArgs: whereArgs,
@@ -313,7 +313,7 @@ class SqliteWorkOrderLocalDataSource implements WorkOrderLocalDataSource {
       limit: limit,
     );
     return List.unmodifiable(rows.map(_mapper.fromRow));
-  });
+  }
 
   Future<LocalWorkOrderRecord?> _readOwned(String localId) async {
     final records = await _readRecords(
