@@ -196,4 +196,33 @@ void main() {
     evidence.clear();
     expect(recommendation.evidence, hasLength(1));
   });
+
+  test('records a UTC staff decision without changing deterministic facts', () {
+    final pending = buildRecommendation();
+    final decided = pending.decide(
+      status: RecommendationStatus.accepted,
+      decisionUserId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      decidedAt: DateTime(2026, 8, 29, 11),
+      remoteVersion: 2,
+    );
+
+    expect(decided.status, RecommendationStatus.accepted);
+    expect(decided.decisionAt!.isUtc, isTrue);
+    expect(decided.remoteVersion, 2);
+    expect(identical(decided.actions, pending.actions), isTrue);
+    expect(identical(decided.evidence, pending.evidence), isTrue);
+    expect(
+      identical(decided.confidenceDetails, pending.confidenceDetails),
+      isTrue,
+    );
+    expect(
+      () => decided.decide(
+        status: RecommendationStatus.rejected,
+        decisionUserId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        decidedAt: DateTime.utc(2026, 8, 29),
+        remoteVersion: 3,
+      ),
+      throwsStateError,
+    );
+  });
 }

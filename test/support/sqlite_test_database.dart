@@ -63,3 +63,16 @@ Future<Database> createVersionThreeFileDatabase(String path) {
     ),
   );
 }
+
+Future<Database> createVersionFourFileDatabase(String path) {
+  sqfliteFfiInit();
+  return databaseFactoryFfi.openDatabase(
+    path,
+    options: OpenDatabaseOptions(
+      version: 4,
+      onConfigure: AppDatabaseSchema.onConfigure,
+      onCreate: AppDatabaseSchema.onCreate,
+      singleInstance: false,
+    ),
+  );
+}
