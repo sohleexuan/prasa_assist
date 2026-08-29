@@ -20,7 +20,9 @@ class RecommendationRuleEvaluation {
         'Actions and evidence must both be empty or nonempty.',
       );
     }
-    final expectedScore = evidence
+    _validateActions(input, this.actions);
+    _validateEvidence(this.evidence);
+    final expectedScore = this.evidence
         .fold<int>(0, (sum, item) => sum + item.contribution)
         .clamp(0, 100)
         .toInt();
@@ -40,4 +42,55 @@ class RecommendationRuleEvaluation {
   final RecommendationConfidence confidenceDetails;
 
   bool get hasRecommendation => actions.isNotEmpty;
+}
+
+void _validateActions(
+  RecommendationRuleInput input,
+  List<RecommendationAction> actions,
+) {
+  for (final action in actions) {
+    switch (action) {
+      case InspectOrRepairVehicleAction():
+        if (action.vehicleId.trim().isEmpty ||
+            action.vehicleId != input.vehicleId) {
+          throw ArgumentError.value(
+            action.vehicleId,
+            'actions',
+            'inspection vehicleId must equal input.vehicleId',
+          );
+        }
+        break;
+      case DeployReplacementBusesAction():
+        if (action.routeId.trim().isEmpty || action.routeId != input.routeId) {
+          throw ArgumentError.value(
+            action.routeId,
+            'actions',
+            'deployment routeId must equal input.routeId',
+          );
+        }
+        break;
+    }
+  }
+}
+
+void _validateEvidence(List<RecommendationEvidence> evidence) {
+  for (final item in evidence) {
+    if (item.ruleId.trim().isEmpty) {
+      throw ArgumentError.value(item.ruleId, 'evidence', 'ruleId is required');
+    }
+    if (item.description.trim().isEmpty) {
+      throw ArgumentError.value(
+        item.description,
+        'evidence',
+        'description is required',
+      );
+    }
+    if (item.contribution < 0 || item.contribution > 100) {
+      throw ArgumentError.value(
+        item.contribution,
+        'evidence',
+        'contribution must be from 0 through 100',
+      );
+    }
+  }
 }

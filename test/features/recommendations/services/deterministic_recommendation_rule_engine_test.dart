@@ -111,13 +111,31 @@ void main() {
       ),
       confidenceScorer: const ExplainableConfidenceScorer(),
     );
+    final result = highPolicyEngine.evaluate(
+      input(VehicleCondition.breakdownConfirmed, OperatingPeriod.peak),
+    );
+    expect(result.score, 100);
+    expect(result.confidenceDetails.finalConfidence, 0.85);
+  });
+
+  test('equal scores retain independently calculated confidence', () {
+    final fullySupported = engine.evaluate(
+      input(VehicleCondition.breakdownConfirmed, OperatingPeriod.offPeak),
+    );
+    final partiallySupported = engine.evaluate(
+      input(VehicleCondition.breakdownConfirmed, OperatingPeriod.unknown),
+    );
+
+    expect(fullySupported.score, 50);
+    expect(partiallySupported.score, 50);
+    expect(fullySupported.confidenceDetails.finalConfidence, 0.85);
     expect(
-      highPolicyEngine
-          .evaluate(
-            input(VehicleCondition.breakdownConfirmed, OperatingPeriod.peak),
-          )
-          .score,
-      100,
+      partiallySupported.confidenceDetails.finalConfidence,
+      closeTo(0.45, 0.000000001),
+    );
+    expect(
+      fullySupported.confidenceDetails.finalConfidence,
+      isNot(partiallySupported.confidenceDetails.finalConfidence),
     );
   });
 }

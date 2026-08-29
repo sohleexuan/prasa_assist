@@ -30,6 +30,29 @@ void main() {
     penalties: const [],
   );
 
+  RecommendationRuleEvaluation buildEvaluation({
+    required List<RecommendationAction> actions,
+    required List<RecommendationEvidence> evidence,
+    required int score,
+  }) => RecommendationRuleEvaluation(
+    input: input,
+    actions: actions,
+    evidence: evidence,
+    score: score,
+    confidenceDetails: confidence,
+  );
+
+  RecommendationEvidence evidence({
+    String ruleId = 'breakdown',
+    String description = 'Confirmed breakdown.',
+    int contribution = 50,
+  }) => RecommendationEvidence(
+    ruleId: ruleId,
+    description: description,
+    dataClassification: EvidenceDataClassification.internalOperationalData,
+    contribution: contribution,
+  );
+
   test('defensively stores a valid recommendation evaluation', () {
     final actions = <RecommendationAction>[
       InspectOrRepairVehicleAction(vehicleId: 'B1023'),
@@ -111,6 +134,76 @@ void main() {
         evidence: const [],
         score: 101,
         confidenceDetails: confidence,
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test('rejects blank or input-mismatched action identifiers', () {
+    expect(
+      () => buildEvaluation(
+        actions: [InspectOrRepairVehicleAction(vehicleId: ' ')],
+        evidence: [evidence()],
+        score: 50,
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => buildEvaluation(
+        actions: [InspectOrRepairVehicleAction(vehicleId: 'B2048')],
+        evidence: [evidence()],
+        score: 50,
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => buildEvaluation(
+        actions: [DeployReplacementBusesAction(routeId: ' ', busCount: 2)],
+        evidence: [evidence()],
+        score: 50,
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => buildEvaluation(
+        actions: [DeployReplacementBusesAction(routeId: '301', busCount: 2)],
+        evidence: [evidence()],
+        score: 50,
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test('rejects malformed evidence text and contributions', () {
+    expect(
+      () => buildEvaluation(
+        actions: [InspectOrRepairVehicleAction(vehicleId: 'B1023')],
+        evidence: [evidence(ruleId: ' ')],
+        score: 50,
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => buildEvaluation(
+        actions: [InspectOrRepairVehicleAction(vehicleId: 'B1023')],
+        evidence: [evidence(description: '\t')],
+        score: 50,
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => buildEvaluation(
+        actions: [InspectOrRepairVehicleAction(vehicleId: 'B1023')],
+        evidence: [evidence(contribution: -1)],
+        score: 0,
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => buildEvaluation(
+        actions: [InspectOrRepairVehicleAction(vehicleId: 'B1023')],
+        evidence: [evidence(contribution: 101)],
+        score: 100,
       ),
       throwsArgumentError,
     );
