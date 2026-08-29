@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prasa_assist/features/work_orders/data/in_memory_work_order_repository.dart';
 import 'package:prasa_assist/features/work_orders/models/work_order.dart';
+import 'package:prasa_assist/features/work_orders/repositories/work_order_data_exception.dart';
 
 void main() {
   final now = DateTime(2026, 8, 27);
@@ -12,6 +13,7 @@ void main() {
         description: description,
         priority: WorkOrderPriority.urgent,
         status: WorkOrderStatus.draft,
+        createdByUserId: '11111111-1111-4111-8111-111111111111',
         createdBy: 'Staff A',
         createdAt: now,
         updatedAt: now,
@@ -33,8 +35,14 @@ void main() {
       initialWorkOrders: [record('WO-1')],
     );
 
-    expect(() => repository.create(record('WO-1')), throwsStateError);
-    expect(() => repository.update(record('WO-2')), throwsStateError);
+    expect(
+      () => repository.create(record('WO-1')),
+      throwsA(isA<WorkOrderDuplicateException>()),
+    );
+    expect(
+      () => repository.update(record('WO-2')),
+      throwsA(isA<WorkOrderNotFoundException>()),
+    );
   });
 
   test('readAll returns an unmodifiable view', () async {

@@ -5,6 +5,7 @@ import 'package:prasa_assist/features/work_orders/controllers/work_orders_contro
 import 'package:prasa_assist/features/work_orders/data/in_memory_work_order_repository.dart';
 import 'package:prasa_assist/features/work_orders/models/work_order.dart';
 import 'package:prasa_assist/features/work_orders/pages/work_order_form_page.dart';
+import 'package:prasa_assist/features/work_orders/repositories/work_order_data_exception.dart';
 
 void main() {
   testWidgets('validates required fields before creating a draft', (
@@ -59,41 +60,24 @@ void main() {
     expect(controller.workOrders.single.vehicleId, 'B2040');
   });
 
-  testWidgets('rejects a schedule whose end is before its start', (
-    tester,
-  ) async {
+  test('domain rejects a schedule whose end is before its start', () {
     final now = DateTime(2026, 8, 27);
-    final invalid = WorkOrder(
-      workOrderId: 'WO-1',
-      vehicleId: 'B1023',
-      taskType: 'Inspection',
-      description: 'Inspect vehicle',
-      priority: WorkOrderPriority.high,
-      scheduledStart: now.add(const Duration(hours: 2)),
-      scheduledEnd: now,
-      status: WorkOrderStatus.draft,
-      createdBy: 'Staff A',
-      createdAt: now,
-      updatedAt: now,
-    );
-    final controller = WorkOrdersController(
-      InMemoryWorkOrderRepository(initialWorkOrders: [invalid]),
-    );
-    addTearDown(controller.dispose);
-    await controller.load();
-
-    await tester.pumpWidget(
-      _TestHost(
-        child: WorkOrderFormPage(controller: controller, workOrder: invalid),
-      ),
-    );
-    await _scrollToBottom(tester);
-    await tester.tap(find.byKey(const Key('saveWorkOrderButton')));
-    await tester.pump();
-
     expect(
-      find.text('Scheduled end cannot be earlier than scheduled start.'),
-      findsOneWidget,
+      () => WorkOrder(
+        workOrderId: 'WO-1',
+        vehicleId: 'B1023',
+        taskType: 'Inspection',
+        description: 'Inspect vehicle',
+        priority: WorkOrderPriority.high,
+        scheduledStart: now.add(const Duration(hours: 2)),
+        scheduledEnd: now,
+        status: WorkOrderStatus.draft,
+        createdByUserId: '11111111-1111-4111-8111-111111111111',
+        createdBy: 'Staff A',
+        createdAt: now,
+        updatedAt: now,
+      ),
+      throwsA(isA<WorkOrderValidationException>()),
     );
   });
 
@@ -105,7 +89,9 @@ void main() {
       taskType: 'Inspection',
       description: 'Completed inspection',
       priority: WorkOrderPriority.high,
+      assignedTo: 'Staff B',
       status: WorkOrderStatus.completed,
+      createdByUserId: '11111111-1111-4111-8111-111111111111',
       createdBy: 'Staff A',
       createdAt: now,
       updatedAt: now,

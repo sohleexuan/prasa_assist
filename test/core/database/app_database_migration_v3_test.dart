@@ -17,7 +17,7 @@ void main() {
           AppDatabaseSchema.migrationTable,
           orderBy: 'version ASC',
         )).map((row) => row['version']),
-        [1, 2, 3],
+        [1, 2, 3, 4],
       );
       final tables = await database.rawQuery(
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN (?, ?)",
@@ -60,7 +60,7 @@ void main() {
           AppDatabaseSchema.migrationTable,
           orderBy: 'version ASC',
         )).map((row) => row['version']),
-        [1, 2, 3],
+        [1, 2, 3, 4],
       );
     });
 
@@ -106,7 +106,7 @@ void main() {
             AppDatabaseSchema.migrationTable,
             orderBy: 'version ASC',
           )).map((row) => row['version']),
-          [1, 2, 3],
+          [1, 2, 3, 4],
         );
       },
     );

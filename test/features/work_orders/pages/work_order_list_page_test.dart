@@ -128,6 +128,7 @@ WorkOrdersController _controllerWithTwoRecords() {
     priority: WorkOrderPriority.high,
     assignedTo: assignedTo,
     status: status,
+    createdByUserId: '11111111-1111-4111-8111-111111111111',
     createdBy: 'Staff A',
     createdAt: now,
     updatedAt: now,

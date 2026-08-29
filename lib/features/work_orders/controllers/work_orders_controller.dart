@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/work_order_repository.dart';
 import '../models/work_order.dart';
+import '../repositories/work_order_data_exception.dart';
 
 class WorkOrdersController extends ChangeNotifier {
   WorkOrdersController(this._repository, {DateTime Function()? now})
@@ -84,6 +85,8 @@ class WorkOrdersController extends ChangeNotifier {
   }
 
   Future<WorkOrder> createDraft({
+    String? incidentId,
+    String? recommendationId,
     required String vehicleId,
     required String taskType,
     required String description,
@@ -96,6 +99,8 @@ class WorkOrdersController extends ChangeNotifier {
     final now = _now();
     final workOrder = WorkOrder(
       workOrderId: 'WO-LOCAL-${now.microsecondsSinceEpoch}-${_nextLocalId++}',
+      incidentId: _optional(incidentId),
+      recommendationId: _optional(recommendationId),
       vehicleId: vehicleId.trim(),
       taskType: taskType.trim(),
       description: description.trim(),
@@ -140,6 +145,7 @@ class WorkOrdersController extends ChangeNotifier {
       scheduledEnd: scheduledEnd,
       status: current.status,
       notes: _optional(notes),
+      createdByUserId: current.createdByUserId,
       createdBy: current.createdBy,
       createdAt: current.createdAt,
       updatedAt: _now(),
@@ -262,6 +268,7 @@ class WorkOrdersController extends ChangeNotifier {
       scheduledEnd: current.scheduledEnd,
       status: status,
       notes: current.notes,
+      createdByUserId: current.createdByUserId,
       createdBy: current.createdBy,
       createdAt: current.createdAt,
       updatedAt: now,
@@ -277,13 +284,4 @@ class WorkOrdersController extends ChangeNotifier {
     final trimmed = value?.trim();
     return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
-}
-
-class WorkOrderValidationException implements Exception {
-  const WorkOrderValidationException(this.message);
-
-  final String message;
-
-  @override
-  String toString() => message;
 }

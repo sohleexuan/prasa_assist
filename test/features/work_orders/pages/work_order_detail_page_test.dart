@@ -25,9 +25,12 @@ void main() {
         scheduledStart: DateTime(2026, 8, 28, 9),
         scheduledEnd: DateTime(2026, 8, 28, 11),
         status: status,
+        createdByUserId: '11111111-1111-4111-8111-111111111111',
         createdBy: 'Demo operations staff',
         createdAt: now,
         updatedAt: now,
+        completedAt: status == WorkOrderStatus.completed ? now : null,
+        cancelledAt: status == WorkOrderStatus.cancelled ? now : null,
       );
 
   testWidgets('shows complete local record details and staff-control wording', (

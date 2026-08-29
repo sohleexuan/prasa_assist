@@ -1,4 +1,5 @@
 import '../models/work_order.dart';
+import '../repositories/work_order_data_exception.dart';
 import 'mock_work_orders.dart';
 import 'work_order_repository.dart';
 
@@ -13,7 +14,9 @@ class InMemoryWorkOrderRepository implements WorkOrderRepository {
     if (_workOrders.any(
       (existing) => existing.workOrderId == workOrder.workOrderId,
     )) {
-      throw StateError('A work order with this ID already exists.');
+      throw const WorkOrderDuplicateException(
+        'A work order with this ID already exists.',
+      );
     }
     _workOrders.add(workOrder);
     return workOrder;
@@ -35,7 +38,9 @@ class InMemoryWorkOrderRepository implements WorkOrderRepository {
     final index = _workOrders.indexWhere(
       (existing) => existing.workOrderId == workOrder.workOrderId,
     );
-    if (index == -1) throw StateError('Work order not found.');
+    if (index == -1) {
+      throw const WorkOrderNotFoundException('Work order not found.');
+    }
     _workOrders[index] = workOrder;
     return workOrder;
   }

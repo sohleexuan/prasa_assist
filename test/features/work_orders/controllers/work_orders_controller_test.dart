@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:prasa_assist/features/work_orders/controllers/work_orders_controller.dart';
 import 'package:prasa_assist/features/work_orders/data/in_memory_work_order_repository.dart';
 import 'package:prasa_assist/features/work_orders/models/work_order.dart';
+import 'package:prasa_assist/features/work_orders/repositories/work_order_data_exception.dart';
 
 void main() {
   final operationTime = DateTime(2026, 8, 28, 10, 30);
@@ -27,6 +28,31 @@ void main() {
     expect(controller.workOrders, hasLength(1));
   });
 
+  test(
+    'createDraft preserves optional incident and recommendation IDs',
+    () async {
+      final controller = WorkOrdersController(
+        InMemoryWorkOrderRepository(initialWorkOrders: []),
+      );
+      addTearDown(controller.dispose);
+      await controller.load();
+
+      final created = await controller.createDraft(
+        incidentId: ' INC-1 ',
+        recommendationId: ' REC-1 ',
+        vehicleId: 'B1023',
+        taskType: 'Inspection',
+        description: 'Inspect Route 300 breakdown.',
+        priority: WorkOrderPriority.urgent,
+        createdBy: 'Staff A',
+      );
+
+      expect(created.incidentId, 'INC-1');
+      expect(created.recommendationId, 'REC-1');
+      expect(created.createdByUserId, isNull);
+    },
+  );
+
   test('updates an eligible local record', () async {
     final now = DateTime(2026, 8, 27);
     final original = WorkOrder(
@@ -36,6 +62,7 @@ void main() {
       description: 'Original',
       priority: WorkOrderPriority.high,
       status: WorkOrderStatus.draft,
+      createdByUserId: '11111111-1111-4111-8111-111111111111',
       createdBy: 'Staff A',
       createdAt: now,
       updatedAt: now,
@@ -64,7 +91,9 @@ void main() {
       taskType: 'Inspection',
       description: 'Done',
       priority: WorkOrderPriority.high,
+      assignedTo: 'Staff B',
       status: WorkOrderStatus.completed,
+      createdByUserId: '11111111-1111-4111-8111-111111111111',
       createdBy: 'Staff A',
       createdAt: now,
       updatedAt: now,
@@ -83,7 +112,7 @@ void main() {
         description: 'Changed',
         priority: WorkOrderPriority.high,
       ),
-      throwsStateError,
+      throwsA(anyOf(isA<StateError>(), isA<WorkOrderValidationException>())),
     );
     expect(controller.workOrders, hasLength(1));
     expect(controller.workOrders.single.status, WorkOrderStatus.completed);
@@ -111,8 +140,8 @@ void main() {
 
     final completed = await controller.completeWork('WO-1');
     expect(completed.status, WorkOrderStatus.completed);
-    expect(completed.updatedAt, operationTime);
-    expect(completed.completedAt, operationTime);
+    expect(completed.updatedAt, operationTime.toUtc());
+    expect(completed.completedAt, operationTime.toUtc());
     expect(completed.cancelledAt, isNull);
   });
 
@@ -124,7 +153,8 @@ void main() {
         status: status,
         assignedTo:
             status == WorkOrderStatus.assigned ||
-                status == WorkOrderStatus.inProgress
+                status == WorkOrderStatus.inProgress ||
+                status == WorkOrderStatus.completed
             ? 'Staff B'
             : null,
       );
@@ -137,7 +167,7 @@ void main() {
       final cancelled = await controller.cancelWorkOrder('WO-1');
 
       expect(cancelled.status, WorkOrderStatus.cancelled);
-      expect(cancelled.cancelledAt, operationTime);
+      expect(cancelled.cancelledAt, operationTime.toUtc());
       expect(cancelled.completedAt, isNull);
       expect(controller.workOrders, hasLength(1));
       controller.dispose();
@@ -262,7 +292,13 @@ WorkOrder _readyRecord({
     taskType: taskType,
     description: description,
     priority: WorkOrderPriority.high,
-    assignedTo: assignedTo,
+    assignedTo:
+        assignedTo ??
+        (status == WorkOrderStatus.assigned ||
+                status == WorkOrderStatus.inProgress ||
+                status == WorkOrderStatus.completed
+            ? 'Staff B'
+            : null),
     scheduledStart: includeSchedule
         ? scheduledStart ?? DateTime(2026, 8, 28, 9)
         : null,
@@ -270,8 +306,11 @@ WorkOrder _readyRecord({
         ? scheduledEnd ?? DateTime(2026, 8, 28, 11)
         : null,
     status: status,
+    createdByUserId: '11111111-1111-4111-8111-111111111111',
     createdBy: 'Staff A',
     createdAt: createdAt,
     updatedAt: createdAt,
+    completedAt: status == WorkOrderStatus.completed ? createdAt : null,
+    cancelledAt: status == WorkOrderStatus.cancelled ? createdAt : null,
   );
 }
