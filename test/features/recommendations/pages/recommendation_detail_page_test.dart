@@ -65,6 +65,11 @@ class _FixedRepository implements RecommendationRepository {
   @override
   Future<RecommendationRecordDto> generateAnalysis(String id) async => record;
   @override
+  Future<RecommendationRecordDto> createPending(
+    RecommendationRecordDto record,
+  ) => throw UnimplementedError();
+
+  @override
   Future<RecommendationRecordDto> decide(
     String id, {
     required String decision,

@@ -3,6 +3,7 @@ import '../dto/recommendation_record_dto.dart';
 abstract interface class RecommendationRemoteDataSource {
   Future<List<RecommendationRecordDto>> fetchAll();
   Future<RecommendationRecordDto?> fetchById(String id);
+  Future<RecommendationRecordDto> createPending(RecommendationRecordDto record);
   Future<RecommendationRecordDto> decide(
     String id, {
     required String decision,

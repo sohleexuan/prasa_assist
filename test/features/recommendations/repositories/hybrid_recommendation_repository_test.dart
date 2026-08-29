@@ -52,18 +52,58 @@ void main() {
       expect(decided.recommendation.decisionNote, isNull);
     },
   );
+
+  test(
+    'caches a pending recommendation only after remote create succeeds',
+    () async {
+      final remote = _Remote(_record())..failCreate = true;
+      final local = _Local();
+      final repository = HybridRecommendationRepository(
+        remote: remote,
+        local: local,
+        clock: () => DateTime.utc(2026, 8, 29),
+      );
+
+      await expectLater(
+        repository.createPending(_record()),
+        throwsA(isA<RecommendationOfflineException>()),
+      );
+      expect(local.records, isEmpty);
+
+      remote.failCreate = false;
+      final saved = await repository.createPending(_record());
+      expect(saved.recommendation.id, 'rec-1');
+      expect(local.records.single.recommendation.id, 'rec-1');
+      expect(remote.createCalls, 2);
+    },
+  );
 }
 
 class _Remote implements RecommendationRemoteDataSource {
   _Remote(this.record);
   RecommendationRecordDto record;
   bool failAnalysis = false;
+  bool failCreate = false;
   int analysisCalls = 0;
+  int createCalls = 0;
   int? lastExpectedVersion;
   @override
   Future<List<RecommendationRecordDto>> fetchAll() async => [record];
   @override
   Future<RecommendationRecordDto?> fetchById(String id) async => record;
+
+  @override
+  Future<RecommendationRecordDto> createPending(
+    RecommendationRecordDto record,
+  ) async {
+    createCalls++;
+    if (failCreate) {
+      throw const RecommendationOfflineException('Recommendation unavailable.');
+    }
+    this.record = record;
+    return record;
+  }
+
   @override
   Future<RecommendationRecordDto> generateAnalysis(String id) async {
     analysisCalls++;
