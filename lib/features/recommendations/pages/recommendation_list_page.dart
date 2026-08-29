@@ -14,10 +14,12 @@ class RecommendationListPage extends StatefulWidget {
   const RecommendationListPage({
     required this.controller,
     required this.workOrdersController,
+    this.onPrepareServiceDeployment,
     super.key,
   });
   final RecommendationController controller;
   final WorkOrdersController workOrdersController;
+  final PrepareServiceDeploymentCallback? onPrepareServiceDeployment;
 
   @override
   State<RecommendationListPage> createState() => _RecommendationListPageState();
@@ -87,6 +89,7 @@ class _RecommendationListPageState extends State<RecommendationListPage> {
                   recommendationId: item.id,
                   controller: widget.controller,
                   workOrdersController: widget.workOrdersController,
+                  onPrepareServiceDeployment: widget.onPrepareServiceDeployment,
                 ),
               ),
             ),

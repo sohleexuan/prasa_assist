@@ -1,27 +1,39 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/app_error_state.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
 import '../../../shared/widgets/app_section_card.dart';
+import '../../deployments/models/deployment_prefill.dart';
 import '../../work_orders/controllers/work_orders_controller.dart';
 import '../../work_orders/pages/work_order_form_page.dart';
 import '../controllers/recommendation_controller.dart';
 import '../domain/recommendation_action.dart';
 import '../domain/recommendation_status.dart';
 import '../services/recommendation_work_order_prefill_factory.dart';
+import '../services/recommendation_deployment_prefill_factory.dart';
 import '../widgets/recommendation_analysis_panel.dart';
+
+/// Lets the coordinator open Module 3's editable create form. The callback is
+/// advisory only; Module 4 does not navigate or persist a deployment.
+typedef PrepareServiceDeploymentCallback = FutureOr<void> Function(
+  DeploymentPrefill prefill,
+);
 
 class RecommendationDetailPage extends StatefulWidget {
   const RecommendationDetailPage({
     required this.recommendationId,
     required this.controller,
     required this.workOrdersController,
+    this.onPrepareServiceDeployment,
     super.key,
   });
   final String recommendationId;
   final RecommendationController controller;
   final WorkOrdersController workOrdersController;
+  final PrepareServiceDeploymentCallback? onPrepareServiceDeployment;
   @override
   State<RecommendationDetailPage> createState() =>
       _RecommendationDetailPageState();
@@ -64,6 +76,9 @@ class _RecommendationDetailPageState extends State<RecommendationDetailPage> {
     }
     final item = record.recommendation;
     final busy = widget.controller.isBusy(item.id);
+    final canPrepareServiceDeployment =
+        item.status == RecommendationStatus.accepted &&
+        item.actions.any((action) => action is DeployReplacementBusesAction);
     return AppPageScaffold(
       title: 'Recommendation review',
       body: ListView(
@@ -165,6 +180,17 @@ class _RecommendationDetailPageState extends State<RecommendationDetailPage> {
                 icon: const Icon(Icons.build_outlined),
                 label: const Text('Prepare Work Order'),
               ),
+              if (canPrepareServiceDeployment) ...[
+                const SizedBox(height: AppSpacing.sm),
+                FilledButton.icon(
+                  key: const Key('prepareServiceDeploymentButton'),
+                  onPressed: widget.onPrepareServiceDeployment == null
+                      ? null
+                      : _prepareServiceDeployment,
+                  icon: const Icon(Icons.directions_bus_outlined),
+                  label: const Text('Prepare Service Deployment'),
+                ),
+              ],
             ],
           ],
         ],
@@ -219,6 +245,14 @@ class _RecommendationDetailPageState extends State<RecommendationDetailPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _prepareServiceDeployment() async {
+    final callback = widget.onPrepareServiceDeployment;
+    if (callback == null) return;
+    final record = widget.controller.find(widget.recommendationId)!;
+    final prefill = RecommendationDeploymentPrefillFactory().create(record);
+    await callback(prefill);
   }
 }
 
