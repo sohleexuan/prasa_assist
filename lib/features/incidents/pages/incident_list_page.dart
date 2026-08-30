@@ -11,6 +11,7 @@ import '../../../shared/widgets/app_page_scaffold.dart';
 import '../../../shared/widgets/app_section_card.dart';
 import '../controllers/incident_controller.dart';
 import '../controllers/incident_state.dart';
+import '../integration/m1_incident_recommendation_facts.dart';
 import '../models/incident.dart';
 import '../models/incident_enums.dart';
 import '../models/incident_query.dart';
@@ -34,6 +35,7 @@ class IncidentListPage extends StatefulWidget {
     this.repository,
     this.onReportIncident,
     this.onOpenIncident,
+    this.onPrepareIncidentRecommendation,
     this.clock,
     this.incidentIdGenerator,
     super.key,
@@ -43,6 +45,7 @@ class IncidentListPage extends StatefulWidget {
   final IncidentRepository? repository;
   final VoidCallback? onReportIncident;
   final ValueChanged<Incident>? onOpenIncident;
+  final PrepareIncidentRecommendationCallback? onPrepareIncidentRecommendation;
   final DateTime Function()? clock;
   final IncidentIdGenerator? incidentIdGenerator;
 
@@ -340,6 +343,8 @@ class _IncidentListPageState extends State<IncidentListPage> {
           incidentId: incident.incidentId,
           currentStaffId: widget.currentStaffId,
           clock: widget.clock,
+          onPrepareIncidentRecommendation:
+              widget.onPrepareIncidentRecommendation,
           onDeleted: () => Navigator.of(routeContext).pop(),
         ),
       ),
