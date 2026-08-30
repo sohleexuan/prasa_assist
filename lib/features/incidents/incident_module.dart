@@ -7,6 +7,7 @@
 export 'data/incident_demo_data.dart';
 export 'data/sources/supabase_incident_remote_data_source.dart';
 export 'integration/incident_operational_snapshot.dart';
+export 'integration/m1_incident_recommendation_facts.dart';
 export 'models/delay_estimate.dart';
 export 'models/incident.dart';
 export 'models/incident_enums.dart';
