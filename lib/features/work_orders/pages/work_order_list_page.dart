@@ -7,16 +7,28 @@ import '../../../shared/widgets/app_error_state.dart';
 import '../../../shared/widgets/app_loading_indicator.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
 import '../controllers/work_orders_controller.dart';
-import '../data/in_memory_work_order_repository.dart';
 import '../models/work_order.dart';
+import '../repositories/work_order_hybrid_operations.dart';
 import '../widgets/work_order_card.dart';
 import 'work_order_detail_page.dart';
 import 'work_order_form_page.dart';
 
 class WorkOrderListPage extends StatefulWidget {
-  const WorkOrderListPage({this.controller, super.key});
+  const WorkOrderListPage({required this.controller, super.key});
 
-  final WorkOrdersController? controller;
+  factory WorkOrderListPage.hybrid({
+    required WorkOrderHybridOperations operations,
+    String localDraftCreatedByLabel = 'Current operations staff',
+    Key? key,
+  }) => WorkOrderListPage(
+    key: key,
+    controller: WorkOrdersController.hybrid(
+      operations,
+      localDraftCreatedByLabel: localDraftCreatedByLabel,
+    ),
+  );
+
+  final WorkOrdersController controller;
 
   @override
   State<WorkOrderListPage> createState() => _WorkOrderListPageState();
@@ -30,10 +42,8 @@ class _WorkOrderListPageState extends State<WorkOrderListPage> {
   @override
   void initState() {
     super.initState();
-    _ownsController = widget.controller == null;
-    _controller =
-        widget.controller ??
-        WorkOrdersController(InMemoryWorkOrderRepository());
+    _ownsController = false;
+    _controller = widget.controller;
     _searchController = TextEditingController(text: _controller.searchQuery);
     _controller.addListener(_refresh);
     _controller.load();
@@ -77,8 +87,7 @@ class _WorkOrderListPageState extends State<WorkOrderListPage> {
               0,
             ),
             child: Text(
-              'Local demonstration data only — not government, live, or '
-              'real-time data. AI recommends. Staff decides.',
+              _sourceMessage(),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSecondaryContainer,
               ),
@@ -159,7 +168,7 @@ class _WorkOrderListPageState extends State<WorkOrderListPage> {
   Widget _buildContent() {
     if (_controller.isLoading) {
       return const AppLoadingIndicator(
-        message: 'Loading local demonstration work orders',
+        message: 'Loading work orders',
       );
     }
     if (_controller.errorMessage != null) {
@@ -173,7 +182,7 @@ class _WorkOrderListPageState extends State<WorkOrderListPage> {
     if (_controller.workOrders.isEmpty) {
       return AppEmptyState(
         title: 'No work orders',
-        message: 'Create a local draft work order for staff review.',
+        message: 'Create a draft for staff review, then publish it explicitly when ready.',
         actionLabel: 'Create work order',
         onAction: _create,
       );
@@ -181,7 +190,7 @@ class _WorkOrderListPageState extends State<WorkOrderListPage> {
     if (_controller.visibleWorkOrders.isEmpty) {
       return AppEmptyState(
         title: 'No matching work orders',
-        message: 'No local records match the current search and status.',
+        message: 'No work orders match the current search and status.',
         actionLabel: 'Clear filters',
         onAction: () {
           _searchController.clear();
@@ -215,6 +224,17 @@ class _WorkOrderListPageState extends State<WorkOrderListPage> {
         builder: (_) => WorkOrderFormPage(controller: _controller),
       ),
     );
+  }
+
+  String _sourceMessage() {
+    final provenance = _controller.readProvenance;
+    if (provenance == null) {
+      return 'Draft records stay on this device until staff explicitly publish them. AI recommends. Staff decides.';
+    }
+    final state = provenance.isCached
+        ? 'Showing verified cached confirmed records while remote access is unavailable.'
+        : 'Showing confirmed shared work orders from the remote service.';
+    return '$state Local drafts remain offline until staff explicitly publish them. AI recommends. Staff decides.';
   }
 
   Future<void> _openDetails(String workOrderId) async {
