@@ -61,7 +61,7 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
       body: workOrder == null
           ? const AppErrorState(
               title: 'Work order unavailable',
-              message: 'This local demonstration record could not be found.',
+              message: 'This work-order record could not be found.',
             )
           : Align(
               alignment: Alignment.topCenter,
@@ -71,7 +71,7 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
                   padding: const EdgeInsets.all(AppSpacing.md),
                   children: [
                     Text(
-                      'Local demonstration data — not live or real-time',
+                      _recordStateMessage(workOrder),
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -189,6 +189,19 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
   }
 
   Widget _buildActions(WorkOrder workOrder) {
+    if (widget.controller.isLocalDraft(workOrder.workOrderId)) {
+      return AppSectionCard(
+        title: 'Draft review',
+        subtitle:
+            'Saving keeps this draft on the device. Publish only after staff review confirms that a shared work order should be created.',
+        body: FilledButton.icon(
+          key: const Key('publishWorkOrderAction'),
+          onPressed: _isWorking ? null : () => _confirmPublish(workOrder),
+          icon: const Icon(Icons.publish_outlined),
+          label: const Text('Publish confirmed work order'),
+        ),
+      );
+    }
     final primary = switch (workOrder.status) {
       WorkOrderStatus.draft => FilledButton.icon(
         key: const Key('openWorkOrderAction'),
@@ -247,6 +260,21 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
     if (confirmed) {
       await _runAction(
         () => widget.controller.openWorkOrder(workOrder.workOrderId),
+      );
+    }
+  }
+
+  Future<void> _confirmPublish(WorkOrder workOrder) async {
+    final confirmed = await _confirm(
+      title: 'Publish confirmed work order?',
+      message:
+          'Publish ${workOrder.workOrderId} as a shared confirmed work order? Staff must review and explicitly confirm this action. If remote confirmation is unavailable, this draft remains local for later review.',
+      confirmLabel: 'Confirm publication',
+    );
+    if (confirmed) {
+      await _runAction(
+        () => widget.controller.publishLocalDraft(workOrder.workOrderId),
+        successMessage: 'Work order confirmed by the remote service.',
       );
     }
   }
@@ -340,19 +368,26 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
     );
   }
 
-  Future<void> _runAction(Future<WorkOrder> Function() action) async {
+  Future<void> _runAction(
+    Future<WorkOrder> Function() action, {
+    String successMessage = 'Work order updated by staff.',
+  }) async {
     setState(() => _isWorking = true);
     try {
       await action();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Work order updated by staff.')),
+        SnackBar(content: Text(successMessage)),
       );
     } on WorkOrderValidationException catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(error.message)));
     } on StateError catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.message)));
+    } on WorkOrderDataException catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(error.message)));
@@ -370,6 +405,16 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
 
   String _formatLifecycle(DateTime? value) =>
       value == null ? 'Not recorded' : _format(value);
+
+  String _recordStateMessage(WorkOrder workOrder) {
+    if (widget.controller.isLocalDraft(workOrder.workOrderId)) {
+      return 'Local draft — not yet a confirmed shared work order';
+    }
+    if (widget.controller.readProvenance?.isCached ?? false) {
+      return 'Verified cached confirmed record — remote service currently unavailable';
+    }
+    return 'Confirmed shared work order';
+  }
 }
 
 class _AssignmentDialog extends StatefulWidget {

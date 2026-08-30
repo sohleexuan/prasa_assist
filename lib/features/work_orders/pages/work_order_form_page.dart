@@ -95,7 +95,9 @@ class _WorkOrderFormPageState extends State<WorkOrderFormPage> {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  'Review all local demonstration details before saving.',
+                  _isEditing
+                      ? 'Review the details before saving. Local drafts remain offline; confirmed records use the latest remote version.'
+                      : 'Review the details before saving a local draft. Publication is a separate staff-confirmed action.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),

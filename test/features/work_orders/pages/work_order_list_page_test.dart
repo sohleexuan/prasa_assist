@@ -7,18 +7,18 @@ import 'package:prasa_assist/features/work_orders/models/work_order.dart';
 import 'package:prasa_assist/features/work_orders/pages/work_order_list_page.dart';
 
 void main() {
-  testWidgets('shows labelled mock scenario and opens its details', (
+  testWidgets('shows the supplied work-order scenario and opens its details', (
     tester,
   ) async {
-    await tester.pumpWidget(const _TestHost(child: WorkOrderListPage()));
+    final controller = WorkOrdersController(InMemoryWorkOrderRepository());
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      _TestHost(child: WorkOrderListPage(controller: controller)),
+    );
     await tester.pumpAndSettle();
 
     expect(
-      find.textContaining('Local demonstration data only'),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining('not government, live, or real-time'),
+      find.textContaining('Draft records stay on this device'),
       findsOneWidget,
     );
     expect(find.text('B1023 · Vehicle inspection'), findsOneWidget);
@@ -57,7 +57,11 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const _TestHost(child: WorkOrderListPage()));
+    final controller = WorkOrdersController(InMemoryWorkOrderRepository());
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      _TestHost(child: WorkOrderListPage(controller: controller)),
+    );
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
