@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'controllers/deployment_controller.dart';
 import 'controllers/route_catalog_controller.dart';
 import 'data/dto/local_deployment_record.dart';
+import 'models/deployment_prefill.dart';
 import 'models/service_deployment.dart';
 import 'repositories/bundled_route_catalog_repository.dart';
 import 'repositories/deployment_repository.dart';
@@ -22,6 +23,7 @@ class ServiceDeploymentPage extends StatefulWidget {
   const ServiceDeploymentPage({
     this.repository,
     this.routeCatalogRepository,
+    this.initialCreatePrefill,
     this.currentUserId = prototypeUserId,
     this.clock,
     this.deploymentIdGenerator,
@@ -32,6 +34,11 @@ class ServiceDeploymentPage extends StatefulWidget {
 
   final DeploymentRepository? repository;
   final RouteCatalogRepository? routeCatalogRepository;
+
+  /// Opens the existing editable create form once after navigation to this
+  /// page. The caller must supply an advisory [DeploymentPrefill]; it never
+  /// creates, schedules, publishes, or allocates a deployment by itself.
+  final DeploymentPrefill? initialCreatePrefill;
   final String currentUserId;
   final DateTime Function()? clock;
   final String Function(int sequence)? deploymentIdGenerator;
@@ -47,6 +54,7 @@ class _ServiceDeploymentPageState extends State<ServiceDeploymentPage> {
   late final Future<void> _routeCatalogLoad;
   final Set<String> _issuedDeploymentIds = {'DEP-120'};
   int _deploymentIdSequence = 0;
+  bool _initialCreatePrefillHandled = false;
 
   DateTime get _now => (widget.clock ?? DateTime.now)();
 
@@ -64,6 +72,17 @@ class _ServiceDeploymentPageState extends State<ServiceDeploymentPage> {
       widget.routeCatalogRepository ?? const BundledRouteCatalogRepository(),
     );
     _routeCatalogLoad = _routeCatalogController.loadCatalog();
+    if (widget.initialCreatePrefill != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _initialCreatePrefillHandled) {
+          return;
+        }
+        _initialCreatePrefillHandled = true;
+        unawaited(
+          _openCreateForm(context, prefill: widget.initialCreatePrefill),
+        );
+      });
+    }
   }
 
   @override
@@ -92,7 +111,10 @@ class _ServiceDeploymentPageState extends State<ServiceDeploymentPage> {
     );
   }
 
-  Future<void> _openCreateForm(BuildContext context) async {
+  Future<void> _openCreateForm(
+    BuildContext context, {
+    DeploymentPrefill? prefill,
+  }) async {
     final saved = await Navigator.of(context).push<Object?>(
       MaterialPageRoute<Object?>(
         builder: (formContext) => DeploymentFormScreen(
@@ -101,6 +123,7 @@ class _ServiceDeploymentPageState extends State<ServiceDeploymentPage> {
           currentUserId: widget.currentUserId,
           deploymentIdGenerator: _nextDeploymentId,
           clock: () => _now,
+          prefill: prefill,
           onSaved: (deployment) => Navigator.of(formContext).pop(deployment),
           onLocalSaved: (record) => Navigator.of(formContext).pop(record),
           onCancel: () => Navigator.of(formContext).pop(),

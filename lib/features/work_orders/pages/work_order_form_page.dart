@@ -5,16 +5,19 @@ import '../../../shared/widgets/app_error_state.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
 import '../controllers/work_orders_controller.dart';
 import '../models/work_order.dart';
+import '../models/work_order_prefill.dart';
 
 class WorkOrderFormPage extends StatefulWidget {
   const WorkOrderFormPage({
     required this.controller,
     this.workOrder,
+    this.prefill,
     super.key,
-  });
+  }) : assert(workOrder == null || prefill == null);
 
   final WorkOrdersController controller;
   final WorkOrder? workOrder;
+  final WorkOrderPrefill? prefill;
 
   @override
   State<WorkOrderFormPage> createState() => _WorkOrderFormPageState();
@@ -38,11 +41,19 @@ class _WorkOrderFormPageState extends State<WorkOrderFormPage> {
   void initState() {
     super.initState();
     final workOrder = widget.workOrder;
-    _vehicleId = TextEditingController(text: workOrder?.vehicleId);
-    _taskType = TextEditingController(text: workOrder?.taskType);
-    _description = TextEditingController(text: workOrder?.description);
-    _notes = TextEditingController(text: workOrder?.notes);
-    _priority = workOrder?.priority ?? WorkOrderPriority.medium;
+    final prefill = widget.prefill;
+    _vehicleId = TextEditingController(
+      text: workOrder?.vehicleId ?? prefill?.vehicleId,
+    );
+    _taskType = TextEditingController(
+      text: workOrder?.taskType ?? prefill?.taskType,
+    );
+    _description = TextEditingController(
+      text: workOrder?.description ?? prefill?.description,
+    );
+    _notes = TextEditingController(text: workOrder?.notes ?? prefill?.notes);
+    _priority =
+        workOrder?.priority ?? prefill?.priority ?? WorkOrderPriority.medium;
     _scheduledStart = workOrder?.scheduledStart;
     _scheduledEnd = workOrder?.scheduledEnd;
   }
@@ -275,6 +286,8 @@ class _WorkOrderFormPageState extends State<WorkOrderFormPage> {
         );
       } else {
         await widget.controller.createDraft(
+          incidentId: widget.prefill?.incidentId,
+          recommendationId: widget.prefill?.recommendationId,
           vehicleId: _vehicleId.text,
           taskType: _taskType.text,
           description: _description.text,

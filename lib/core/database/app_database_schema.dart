@@ -3,10 +3,11 @@ import 'package:sqflite/sqflite.dart';
 import 'migrations/app_database_migration_v2.dart';
 import 'migrations/app_database_migration_v3.dart';
 import 'migrations/app_database_migration_v4.dart';
+import 'migrations/app_database_migration_v5.dart';
 
 abstract final class AppDatabaseSchema {
   static const String filename = 'prasa_assist.db';
-  static const int version = 4;
+  static const int version = 5;
   static const String migrationTable = 'local_schema_migrations';
 
   static Future<void> onConfigure(Database database) async {
@@ -63,6 +64,12 @@ abstract final class AppDatabaseSchema {
           await AppDatabaseMigrationV4.apply(database);
           await database.insert(migrationTable, <String, Object?>{
             'version': 4,
+            'applied_at_utc': DateTime.now().toUtc().toIso8601String(),
+          });
+        case 5:
+          await AppDatabaseMigrationV5.apply(database);
+          await database.insert(migrationTable, <String, Object?>{
+            'version': 5,
             'applied_at_utc': DateTime.now().toUtc().toIso8601String(),
           });
         default:

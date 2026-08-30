@@ -7,6 +7,7 @@ import 'package:prasa_assist/core/dependencies/app_dependencies_scope.dart';
 import 'package:prasa_assist/features/deployments/repositories/hybrid_deployment_repository.dart';
 import 'package:prasa_assist/features/deployments/service_deployment_page.dart';
 import 'package:prasa_assist/features/incidents/incident_module.dart';
+import 'package:prasa_assist/features/recommendations/pages/recommendation_list_page.dart';
 
 import '../support/fake_auth_gateway.dart';
 import '../support/test_dependencies.dart';
@@ -18,10 +19,7 @@ void main() {
     'Service Deployment',
     'AI Recommendations',
   ];
-  const placeholderModuleNames = [
-    'Maintenance Work Orders',
-    'AI Recommendations',
-  ];
+  const placeholderModuleNames = ['Maintenance Work Orders'];
 
   testWidgets('home page renders foundation messaging and four modules', (
     tester,
@@ -146,6 +144,23 @@ void main() {
       );
     });
   }
+
+  testWidgets('navigates from AI Recommendations to the review workflow', (
+    tester,
+  ) async {
+    await _pumpAuthenticatedApp(tester);
+    final moduleEntry = find.text('AI Recommendations');
+    await tester.scrollUntilVisible(
+      moduleEntry,
+      160,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(moduleEntry);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(RecommendationListPage), findsOneWidget);
+  });
 
   testWidgets(
     'deployment registry builder injects Supabase persistence and auth label',
