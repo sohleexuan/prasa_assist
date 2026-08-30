@@ -56,13 +56,25 @@ void main() {
       expect(json, isNot(contains('automatic_action_allowed')));
     });
 
-    test('does not depend on Module 4 implementation files', () {
-      final source = File(
-        'lib/features/incidents/integration/m1_incident_recommendation_facts.dart',
-      ).readAsStringSync();
+    test('Module 1 does not import Module 4', () {
+      final moduleFiles = Directory('lib/features/incidents')
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((file) => file.path.endsWith('.dart'));
 
-      expect(source, isNot(contains('features/recommendations')));
-      expect(source, isNot(contains('VerifiedIncidentRecommendationInput')));
+      for (final file in moduleFiles) {
+        final source = file.readAsStringSync();
+        expect(
+          source,
+          isNot(contains('features/recommendations')),
+          reason: file.path,
+        );
+        expect(
+          source,
+          isNot(contains('VerifiedIncidentRecommendationInput')),
+          reason: file.path,
+        );
+      }
     });
 
     test('keeps a missing vehicle ID null', () {
