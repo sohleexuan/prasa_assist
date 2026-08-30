@@ -5,7 +5,6 @@ import '../../../shared/widgets/app_empty_state.dart';
 import '../../../shared/widgets/app_error_state.dart';
 import '../../../shared/widgets/app_loading_indicator.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
-import '../../work_orders/controllers/work_orders_controller.dart';
 import '../controllers/recommendation_controller.dart';
 import '../domain/recommendation_status.dart';
 import 'recommendation_detail_page.dart';
@@ -13,12 +12,18 @@ import 'recommendation_detail_page.dart';
 class RecommendationListPage extends StatefulWidget {
   const RecommendationListPage({
     required this.controller,
-    required this.workOrdersController,
+    this.onPrepareWorkOrder,
+    this.workOrdersController,
     this.onPrepareServiceDeployment,
     super.key,
   });
   final RecommendationController controller;
-  final WorkOrdersController workOrdersController;
+  final PrepareWorkOrderCallback? onPrepareWorkOrder;
+
+  /// Retained temporarily so existing app composition can transfer ownership
+  /// without Module 4 using it for navigation or persistence.
+  @Deprecated('Use onPrepareWorkOrder for coordinator-owned navigation.')
+  final ChangeNotifier? workOrdersController;
   final PrepareServiceDeploymentCallback? onPrepareServiceDeployment;
 
   @override
@@ -37,7 +42,7 @@ class _RecommendationListPageState extends State<RecommendationListPage> {
   void dispose() {
     widget.controller.removeListener(_refresh);
     widget.controller.dispose();
-    widget.workOrdersController.dispose();
+    widget.workOrdersController?.dispose();
     super.dispose();
   }
 
@@ -88,7 +93,7 @@ class _RecommendationListPageState extends State<RecommendationListPage> {
                 builder: (_) => RecommendationDetailPage(
                   recommendationId: item.id,
                   controller: widget.controller,
-                  workOrdersController: widget.workOrdersController,
+                  onPrepareWorkOrder: widget.onPrepareWorkOrder,
                   onPrepareServiceDeployment: widget.onPrepareServiceDeployment,
                 ),
               ),
