@@ -71,8 +71,10 @@ class _FakeRemote implements WorkOrderRemoteDataSource {
     required int expectedVersion,
   }) => throw UnimplementedError();
   @override
-  Future<WorkOrderRecordDto> create(LocalWorkOrderDraft draft) =>
-      throw UnimplementedError();
+  Future<WorkOrderRecordDto> create(
+    String publicationKey,
+    LocalWorkOrderDraft draft,
+  ) => throw UnimplementedError();
   @override
   Future<List<WorkOrderRecordDto>> fetchAll() => throw UnimplementedError();
   @override
@@ -81,7 +83,6 @@ class _FakeRemote implements WorkOrderRemoteDataSource {
   @override
   Future<WorkOrderRecordDto> transitionStatus(
     String workOrderId, {
-    required WorkOrderStatus fromStatus,
     required WorkOrderStatus toStatus,
     required int expectedVersion,
   }) => throw UnimplementedError();

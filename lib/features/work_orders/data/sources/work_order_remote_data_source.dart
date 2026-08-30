@@ -6,7 +6,10 @@ import '../dto/work_order_update_input.dart';
 abstract interface class WorkOrderRemoteDataSource {
   Future<List<WorkOrderRecordDto>> fetchAll();
   Future<WorkOrderRecordDto?> fetchById(String workOrderId);
-  Future<WorkOrderRecordDto> create(LocalWorkOrderDraft draft);
+  Future<WorkOrderRecordDto> create(
+    String publicationKey,
+    LocalWorkOrderDraft draft,
+  );
   Future<WorkOrderRecordDto> update(
     String workOrderId,
     WorkOrderUpdateInput input, {
@@ -19,7 +22,6 @@ abstract interface class WorkOrderRemoteDataSource {
   });
   Future<WorkOrderRecordDto> transitionStatus(
     String workOrderId, {
-    required WorkOrderStatus fromStatus,
     required WorkOrderStatus toStatus,
     required int expectedVersion,
   });
