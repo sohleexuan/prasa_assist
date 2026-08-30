@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_spacing.dart';
@@ -8,6 +10,7 @@ import '../../../shared/widgets/app_page_scaffold.dart';
 import '../../../shared/widgets/app_section_card.dart';
 import '../../../shared/widgets/app_status_chip.dart';
 import '../controllers/incident_controller.dart';
+import '../integration/m1_incident_recommendation_facts.dart';
 import '../models/incident.dart';
 import '../models/incident_enums.dart';
 import '../models/incident_status_change.dart';
@@ -22,6 +25,7 @@ class IncidentDetailPage extends StatefulWidget {
     this.onEdit,
     this.onStatusChanged,
     this.onDeleted,
+    this.onPrepareIncidentRecommendation,
     this.clock,
     super.key,
   });
@@ -32,6 +36,7 @@ class IncidentDetailPage extends StatefulWidget {
   final ValueChanged<Incident>? onEdit;
   final ValueChanged<Incident>? onStatusChanged;
   final VoidCallback? onDeleted;
+  final PrepareIncidentRecommendationCallback? onPrepareIncidentRecommendation;
   final DateTime Function()? clock;
 
   @override
@@ -156,6 +161,17 @@ class _IncidentDetailPageState extends State<IncidentDetailPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (_canPrepareRecommendation(incident)) ...[
+          FilledButton.icon(
+            key: const ValueKey('prepare-ai-recommendation-action'),
+            onPressed: _isSubmitting
+                ? null
+                : () => unawaited(_prepareRecommendation(incident)),
+            icon: const Icon(Icons.auto_awesome_outlined),
+            label: const Text('Prepare AI Recommendation'),
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ],
         if (nextStatuses.isNotEmpty) ...[
           Text(
             'Staff Status Actions',
@@ -224,6 +240,47 @@ class _IncidentDetailPageState extends State<IncidentDetailPage> {
           ),
       ],
     );
+  }
+
+  bool _canPrepareRecommendation(Incident incident) =>
+      widget.onPrepareIncidentRecommendation != null &&
+      !incident.status.isTerminal &&
+      incident.incidentType == IncidentType.vehicleBreakdown &&
+      (incident.vehicleId?.trim().isNotEmpty ?? false);
+
+  Future<void> _prepareRecommendation(Incident incident) async {
+    if (_isSubmitting) {
+      return;
+    }
+    final callback = widget.onPrepareIncidentRecommendation;
+    if (callback == null) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+      _operationError = null;
+    });
+    try {
+      final facts = M1IncidentRecommendationFacts.fromIncident(
+        incident,
+        generatedAt: (widget.clock ?? DateTime.now)(),
+      );
+      await callback(facts);
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isSubmitting = false);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isSubmitting = false;
+        _operationError =
+            'Unable to prepare an AI recommendation. Please try again.';
+      });
+    }
   }
 
   Future<void> _loadIncident() async {

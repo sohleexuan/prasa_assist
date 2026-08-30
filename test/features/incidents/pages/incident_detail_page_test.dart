@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:prasa_assist/core/theme/app_theme.dart';
 import 'package:prasa_assist/features/incidents/controllers/incident_controller.dart';
 import 'package:prasa_assist/features/incidents/data/incident_demo_data.dart';
+import 'package:prasa_assist/features/incidents/integration/m1_incident_recommendation_facts.dart';
 import 'package:prasa_assist/features/incidents/models/incident.dart';
 import 'package:prasa_assist/features/incidents/models/incident_enums.dart';
 import 'package:prasa_assist/features/incidents/models/incident_query.dart';
@@ -165,6 +166,114 @@ void main() {
     expect(edited?.incidentId, 'INC-20260828-001');
   });
 
+  testWidgets(
+    'shows the recommendation CTA for an eligible vehicle breakdown',
+    (tester) async {
+      await _pumpDetail(tester, onPrepareIncidentRecommendation: (_) {});
+
+      expect(
+        find.byKey(const ValueKey('prepare-ai-recommendation-action')),
+        findsOneWidget,
+      );
+      expect(find.text('Prepare AI Recommendation'), findsOneWidget);
+    },
+  );
+
+  testWidgets('hides the recommendation CTA for missing or blank vehicle IDs', (
+    tester,
+  ) async {
+    for (final vehicleId in <String?>[null, '   ']) {
+      final repository = _FixedDetailRepository(
+        IncidentDemoData.busB1023().copyWith(vehicleId: vehicleId),
+      );
+      await _pumpDetail(
+        tester,
+        repository: repository,
+        onPrepareIncidentRecommendation: (_) {},
+      );
+
+      expect(
+        find.byKey(const ValueKey('prepare-ai-recommendation-action')),
+        findsNothing,
+      );
+    }
+  });
+
+  testWidgets('hides the recommendation CTA for a non-breakdown incident', (
+    tester,
+  ) async {
+    final repository = InMemoryIncidentRepository(
+      seedData: [
+        IncidentDemoData.busB1023().copyWith(
+          incidentType: IncidentType.serviceDisruption,
+        ),
+      ],
+      clock: _clock,
+    );
+    await _pumpDetail(
+      tester,
+      repository: repository,
+      onPrepareIncidentRecommendation: (_) {},
+    );
+
+    expect(
+      find.byKey(const ValueKey('prepare-ai-recommendation-action')),
+      findsNothing,
+    );
+  });
+
+  testWidgets(
+    'hides the recommendation CTA for resolved and cancelled incidents',
+    (tester) async {
+      for (final status in <IncidentStatus>[
+        IncidentStatus.resolved,
+        IncidentStatus.cancelled,
+      ]) {
+        final repository = await _repositoryAtStatus(status);
+        await _pumpDetail(
+          tester,
+          repository: repository,
+          onPrepareIncidentRecommendation: (_) {},
+        );
+
+        expect(
+          find.byKey(const ValueKey('prepare-ai-recommendation-action')),
+          findsNothing,
+        );
+      }
+    },
+  );
+
+  testWidgets('exports immutable facts once without modifying the incident', (
+    tester,
+  ) async {
+    final repository = _repository();
+    final before = await repository.getById('INC-20260828-001');
+    M1IncidentRecommendationFacts? receivedFacts;
+    var callbackCount = 0;
+
+    await _pumpDetail(
+      tester,
+      repository: repository,
+      clock: () => DateTime(2026, 8, 30, 17, 30),
+      onPrepareIncidentRecommendation: (facts) {
+        callbackCount++;
+        receivedFacts = facts;
+      },
+    );
+
+    await _tapAction(tester, 'prepare-ai-recommendation-action');
+
+    expect(callbackCount, 1);
+    expect(receivedFacts?.incidentId, 'INC-20260828-001');
+    expect(receivedFacts?.vehicleId, 'B1023');
+    expect(receivedFacts?.routeId, '300');
+    expect(receivedFacts?.incidentDataClassification, 'mock_demonstration');
+    expect(receivedFacts?.delayEstimateClassification, 'demonstration_rule');
+    expect(receivedFacts?.generatedAtUtc, DateTime.utc(2026, 8, 30, 9, 30));
+    expect(await repository.getById('INC-20260828-001'), before);
+  });
+
   testWidgets('warns, allows dismissal, then permanently deletes', (
     tester,
   ) async {
@@ -237,6 +346,8 @@ Future<void> _pumpDetail(
   ValueChanged<Incident>? onEdit,
   ValueChanged<Incident>? onStatusChanged,
   VoidCallback? onDeleted,
+  PrepareIncidentRecommendationCallback? onPrepareIncidentRecommendation,
+  DateTime Function()? clock,
   bool finishLoading = true,
 }) async {
   final effectiveController =
@@ -254,6 +365,8 @@ Future<void> _pumpDetail(
         onEdit: onEdit,
         onStatusChanged: onStatusChanged,
         onDeleted: onDeleted,
+        onPrepareIncidentRecommendation: onPrepareIncidentRecommendation,
+        clock: clock,
       ),
     ),
   );
@@ -333,4 +446,15 @@ class _DelayedDetailRepository extends InMemoryIncidentRepository {
 
   @override
   Future<List<Incident>> getAll({IncidentQuery? query}) async => const [];
+}
+
+class _FixedDetailRepository extends InMemoryIncidentRepository {
+  _FixedDetailRepository(this.incident)
+    : super(seedData: [IncidentDemoData.busB1023()], clock: _clock);
+
+  final Incident incident;
+
+  @override
+  Future<Incident?> getById(String incidentId) async =>
+      incidentId == incident.incidentId ? incident : null;
 }
