@@ -7,8 +7,7 @@ import '../../../shared/widgets/app_error_state.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
 import '../../../shared/widgets/app_section_card.dart';
 import '../../deployments/models/deployment_prefill.dart';
-import '../../work_orders/controllers/work_orders_controller.dart';
-import '../../work_orders/pages/work_order_form_page.dart';
+import '../../work_orders/models/work_order_prefill.dart';
 import '../controllers/recommendation_controller.dart';
 import '../domain/recommendation_action.dart';
 import '../domain/recommendation_status.dart';
@@ -22,17 +21,23 @@ typedef PrepareServiceDeploymentCallback = FutureOr<void> Function(
   DeploymentPrefill prefill,
 );
 
+/// Lets the coordinator open Module 2's editable create form. The callback is
+/// advisory only; Module 4 does not navigate or persist a work order.
+typedef PrepareWorkOrderCallback = FutureOr<void> Function(
+  WorkOrderPrefill prefill,
+);
+
 class RecommendationDetailPage extends StatefulWidget {
   const RecommendationDetailPage({
     required this.recommendationId,
     required this.controller,
-    required this.workOrdersController,
+    this.onPrepareWorkOrder,
     this.onPrepareServiceDeployment,
     super.key,
   });
   final String recommendationId;
   final RecommendationController controller;
-  final WorkOrdersController workOrdersController;
+  final PrepareWorkOrderCallback? onPrepareWorkOrder;
   final PrepareServiceDeploymentCallback? onPrepareServiceDeployment;
   @override
   State<RecommendationDetailPage> createState() =>
@@ -76,6 +81,9 @@ class _RecommendationDetailPageState extends State<RecommendationDetailPage> {
     }
     final item = record.recommendation;
     final busy = widget.controller.isBusy(item.id);
+    final canPrepareWorkOrder =
+        item.status == RecommendationStatus.accepted &&
+        item.actions.any((action) => action is InspectOrRepairVehicleAction);
     final canPrepareServiceDeployment =
         item.status == RecommendationStatus.accepted &&
         item.actions.any((action) => action is DeployReplacementBusesAction);
@@ -174,12 +182,15 @@ class _RecommendationDetailPageState extends State<RecommendationDetailPage> {
             ),
             if (item.status == RecommendationStatus.accepted) ...[
               const SizedBox(height: AppSpacing.sm),
-              FilledButton.icon(
-                key: const Key('prepareWorkOrderButton'),
-                onPressed: _prepareWorkOrder,
-                icon: const Icon(Icons.build_outlined),
-                label: const Text('Prepare Work Order'),
-              ),
+              if (canPrepareWorkOrder)
+                FilledButton.icon(
+                  key: const Key('prepareWorkOrderButton'),
+                  onPressed: widget.onPrepareWorkOrder == null
+                      ? null
+                      : _prepareWorkOrder,
+                  icon: const Icon(Icons.build_outlined),
+                  label: const Text('Prepare Work Order'),
+                ),
               if (canPrepareServiceDeployment) ...[
                 const SizedBox(height: AppSpacing.sm),
                 FilledButton.icon(
@@ -233,18 +244,11 @@ class _RecommendationDetailPageState extends State<RecommendationDetailPage> {
   }
 
   Future<void> _prepareWorkOrder() async {
+    final callback = widget.onPrepareWorkOrder;
+    if (callback == null) return;
     final record = widget.controller.find(widget.recommendationId)!;
-    final prefill = const RecommendationWorkOrderPrefillFactory().create(
-      record,
-    );
-    await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => WorkOrderFormPage(
-          controller: widget.workOrdersController,
-          prefill: prefill,
-        ),
-      ),
-    );
+    final prefill = RecommendationWorkOrderPrefillFactory().create(record);
+    await callback(prefill);
   }
 
   Future<void> _prepareServiceDeployment() async {

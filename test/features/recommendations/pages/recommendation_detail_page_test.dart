@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prasa_assist/core/theme/app_theme.dart';
@@ -10,23 +12,21 @@ import 'package:prasa_assist/features/recommendations/domain/recommendation_conf
 import 'package:prasa_assist/features/recommendations/domain/recommendation_evidence.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation_status.dart';
 import 'package:prasa_assist/features/recommendations/pages/recommendation_detail_page.dart';
+import 'package:prasa_assist/features/recommendations/pages/recommendation_list_page.dart';
 import 'package:prasa_assist/features/recommendations/repositories/recommendation_repository.dart';
-import 'package:prasa_assist/features/work_orders/controllers/work_orders_controller.dart';
-import 'package:prasa_assist/features/work_orders/data/in_memory_work_order_repository.dart';
+import 'package:prasa_assist/features/work_orders/models/work_order.dart';
+import 'package:prasa_assist/features/work_orders/models/work_order_prefill.dart';
 
 void main() {
   testWidgets(
-    'accepted recommendation opens a new prefilled form only on CTA',
+    'accepted maintenance recommendation sends existing prefill only on CTA',
     (tester) async {
       final record = _acceptedRecord();
       final controller = RecommendationController(_FixedRepository(record));
-      final workOrders = WorkOrdersController(
-        InMemoryWorkOrderRepository(initialWorkOrders: []),
-      );
       addTearDown(controller.dispose);
-      addTearDown(workOrders.dispose);
       await controller.load();
-      await workOrders.load();
+      var callbackCalls = 0;
+      WorkOrderPrefill? received;
 
       await tester.pumpWidget(
         MaterialApp(
@@ -34,23 +34,32 @@ void main() {
           home: RecommendationDetailPage(
             recommendationId: 'rec-1',
             controller: controller,
-            workOrdersController: workOrders,
+            onPrepareWorkOrder: (prefill) {
+              callbackCalls++;
+              received = prefill;
+            },
           ),
         ),
       );
       await tester.pumpAndSettle();
-      expect(workOrders.workOrders, isEmpty);
+      expect(callbackCalls, 0);
       expect(find.text('AI recommends. Staff decides.'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.byKey(const Key('prepareWorkOrderButton')),
         300,
       );
       await tester.tap(find.byKey(const Key('prepareWorkOrderButton')));
-      await tester.pumpAndSettle();
+      await tester.pump();
 
-      expect(find.text('Create work order'), findsOneWidget);
-      expect(find.widgetWithText(TextFormField, 'B1023'), findsOneWidget);
-      expect(workOrders.workOrders, isEmpty);
+      expect(callbackCalls, 1);
+      expect(received!.incidentId, 'INC-1');
+      expect(received!.recommendationId, 'rec-1');
+      expect(received!.vehicleId, 'B1023');
+      expect(received!.taskType, 'Vehicle inspection');
+      expect(received!.description, contains('confirmed breakdown'));
+      expect(received!.priority, WorkOrderPriority.high);
+      expect(received!.notes, contains('AI-generated summary'));
+      expect(find.byType(RecommendationDetailPage), findsOneWidget);
     },
   );
 
@@ -64,13 +73,8 @@ void main() {
         ],
       );
       final controller = RecommendationController(_FixedRepository(record));
-      final workOrders = WorkOrdersController(
-        InMemoryWorkOrderRepository(initialWorkOrders: []),
-      );
       addTearDown(controller.dispose);
-      addTearDown(workOrders.dispose);
       await controller.load();
-      await workOrders.load();
 
       var callbackCalls = 0;
       await tester.pumpWidget(
@@ -79,7 +83,6 @@ void main() {
           home: RecommendationDetailPage(
             recommendationId: 'rec-1',
             controller: controller,
-            workOrdersController: workOrders,
             onPrepareServiceDeployment: (prefill) {
               callbackCalls++;
               expect(prefill.incidentId, 'INC-1');
@@ -101,15 +104,147 @@ void main() {
         findsOneWidget,
       );
       expect(callbackCalls, 0);
-      expect(workOrders.workOrders, isEmpty);
 
       await tester.tap(find.byKey(const Key('prepareServiceDeploymentButton')));
       await tester.pump();
 
       expect(callbackCalls, 1);
-      expect(workOrders.workOrders, isEmpty);
     },
   );
+
+  testWidgets('Work Order CTA keeps accepted maintenance visibility rules', (
+    tester,
+  ) async {
+    final cases = <(RecommendationRecordDto, bool)>[
+      (_pendingRecord(), false),
+      (_rejectedRecord(), false),
+      (
+        _acceptedRecord(
+          actions: [DeployReplacementBusesAction(routeId: '300', busCount: 2)],
+        ),
+        false,
+      ),
+      (_acceptedRecord(), true),
+    ];
+
+    for (final (record, visible) in cases) {
+      final controller = RecommendationController(_FixedRepository(record));
+      addTearDown(controller.dispose);
+      await controller.load();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: RecommendationDetailPage(
+            recommendationId: 'rec-1',
+            controller: controller,
+            onPrepareWorkOrder: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      if (visible) {
+        await tester.scrollUntilVisible(
+          find.byKey(const Key('prepareWorkOrderButton')),
+          300,
+        );
+      }
+      expect(
+        find.byKey(const Key('prepareWorkOrderButton')),
+        visible ? findsOneWidget : findsNothing,
+      );
+    }
+  });
+
+  testWidgets('missing Work Order callback leaves a safe disabled CTA', (
+    tester,
+  ) async {
+    final controller = RecommendationController(
+      _FixedRepository(_acceptedRecord()),
+    );
+    addTearDown(controller.dispose);
+    await controller.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: RecommendationDetailPage(
+          recommendationId: 'rec-1',
+          controller: controller,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('prepareWorkOrderButton')),
+      300,
+    );
+
+    final button = tester.widget<FilledButton>(
+      find.byKey(const Key('prepareWorkOrderButton')),
+    );
+    expect(button.onPressed, isNull);
+    await tester.tap(find.byKey(const Key('prepareWorkOrderButton')));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    expect(find.byType(RecommendationDetailPage), findsOneWidget);
+  });
+
+  testWidgets('list passes Work Order callback to detail', (tester) async {
+    final controller = RecommendationController(
+      _FixedRepository(_acceptedRecord()),
+    );
+    WorkOrderPrefill? received;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: RecommendationListPage(
+          controller: controller,
+          onPrepareWorkOrder: (prefill) => received = prefill,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('B1023'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('prepareWorkOrderButton')),
+      300,
+    );
+    await tester.tap(find.byKey(const Key('prepareWorkOrderButton')));
+    await tester.pump();
+
+    expect(received!.incidentId, 'INC-1');
+    expect(received!.recommendationId, 'rec-1');
+    expect(received!.vehicleId, 'B1023');
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  test('Module 4 has no Work Order navigation or persistence dependencies', () {
+    final productionFiles = Directory('lib/features/recommendations')
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((file) => file.path.endsWith('.dart'));
+
+    for (final file in productionFiles) {
+      final source = file.readAsStringSync();
+      expect(source, isNot(contains('WorkOrderFormPage')), reason: file.path);
+      expect(
+        source,
+        isNot(contains('SqliteDraftWorkOrderRepository')),
+        reason: file.path,
+      );
+      expect(
+        source,
+        isNot(contains('/work_orders/controllers/')),
+        reason: file.path,
+      );
+      expect(source, isNot(contains('/work_orders/data/')), reason: file.path);
+    }
+  });
 
   testWidgets(
     'hides service deployment CTA unless accepted with replacements',
@@ -126,13 +261,8 @@ void main() {
         ),
       ]) {
         final controller = RecommendationController(_FixedRepository(record));
-        final workOrders = WorkOrdersController(
-          InMemoryWorkOrderRepository(initialWorkOrders: []),
-        );
         addTearDown(controller.dispose);
-        addTearDown(workOrders.dispose);
         await controller.load();
-        await workOrders.load();
 
         await tester.pumpWidget(
           MaterialApp(
@@ -140,7 +270,6 @@ void main() {
             home: RecommendationDetailPage(
               recommendationId: 'rec-1',
               controller: controller,
-              workOrdersController: workOrders,
             ),
           ),
         );
