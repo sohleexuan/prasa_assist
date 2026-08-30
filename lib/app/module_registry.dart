@@ -23,12 +23,12 @@ import '../features/recommendations/services/deterministic_recommendation_rule_e
 import '../features/recommendations/services/explainable_confidence_scorer.dart';
 import '../features/recommendations/services/incident_recommendation_submission_service.dart';
 import '../features/work_orders/controllers/work_orders_controller.dart';
-import '../features/work_orders/data/sqlite_draft_work_order_repository.dart';
 import '../features/work_orders/data/sources/sqlite_work_order_local_data_source.dart';
 import '../features/work_orders/data/sources/supabase_work_order_remote_data_source.dart';
+import '../features/work_orders/models/work_order_prefill.dart';
+import '../features/work_orders/pages/work_order_form_page.dart';
 import '../features/work_orders/pages/work_order_list_page.dart';
 import '../features/work_orders/repositories/hybrid_work_order_repository.dart';
-import 'production_work_order_repository.dart';
 
 typedef ModulePageBuilder = Widget Function(BuildContext context);
 
@@ -182,7 +182,11 @@ abstract final class ModuleRegistry {
     final recommendationRepository = _buildRecommendationRepository(context);
     return RecommendationListPage(
       controller: RecommendationController(recommendationRepository),
-      workOrdersController: _buildWorkOrderController(context),
+      onPrepareWorkOrder: (prefill) => Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (context) => _buildWorkOrderFormPage(context, prefill),
+        ),
+      ),
       onPrepareServiceDeployment: (prefill) => Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (context) =>
@@ -260,6 +264,8 @@ abstract final class ModuleRegistry {
       );
     }
     final userScope = LocalUserScope(session.userId);
+    final email = session.email?.trim();
+    final staffLabel = email?.isNotEmpty == true ? email! : session.userId;
     var localIdSequence = 0;
     final localDataSource = SqliteWorkOrderLocalDataSource(
       database: dependencies.appDatabase,
@@ -277,13 +283,19 @@ abstract final class ModuleRegistry {
       ),
       localDataSource: localDataSource,
     );
-    return ProductionWorkOrdersController(
-      ProductionWorkOrderRepository(
-        hybridRepository: hybridRepository,
-        draftRepository: SqliteDraftWorkOrderRepository(localDataSource),
-      ),
+    return WorkOrdersController.hybrid(
+      hybridRepository,
+      localDraftCreatedByLabel: staffLabel,
     );
   }
+
+  static Widget _buildWorkOrderFormPage(
+    BuildContext context,
+    WorkOrderPrefill prefill,
+  ) => WorkOrderFormPage(
+    controller: _buildWorkOrderController(context),
+    prefill: prefill,
+  );
 
   static DateTime _utcNow() => DateTime.now().toUtc();
 

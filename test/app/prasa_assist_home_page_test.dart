@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prasa_assist/app/module_registry.dart';
 import 'package:prasa_assist/app/prasa_assist_app.dart';
-import 'package:prasa_assist/app/production_work_order_repository.dart';
 import 'package:prasa_assist/core/auth/auth_gateway.dart';
 import 'package:prasa_assist/core/database/app_database.dart';
 import 'package:prasa_assist/core/dependencies/app_dependencies.dart';
@@ -12,20 +11,20 @@ import 'package:prasa_assist/features/deployments/repositories/hybrid_deployment
 import 'package:prasa_assist/features/deployments/screens/deployment_form_screen.dart';
 import 'package:prasa_assist/features/deployments/service_deployment_page.dart';
 import 'package:prasa_assist/features/incidents/incident_module.dart';
-import 'package:prasa_assist/features/recommendations/controllers/recommendation_controller.dart';
 import 'package:prasa_assist/features/recommendations/data/dto/recommendation_record_dto.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation_action.dart';
+import 'package:prasa_assist/features/recommendations/domain/recommendation_analysis.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation_confidence.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation_evidence.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation_status.dart';
 import 'package:prasa_assist/features/recommendations/pages/incident_recommendation_confirmation_page.dart';
-import 'package:prasa_assist/features/recommendations/pages/recommendation_detail_page.dart';
 import 'package:prasa_assist/features/recommendations/pages/recommendation_list_page.dart';
 import 'package:prasa_assist/features/recommendations/repositories/recommendation_repository.dart';
+import 'package:prasa_assist/features/recommendations/services/recommendation_work_order_prefill_factory.dart';
+import 'package:prasa_assist/features/work_orders/models/work_order.dart';
 import 'package:prasa_assist/features/work_orders/pages/work_order_form_page.dart';
 import 'package:prasa_assist/features/work_orders/pages/work_order_list_page.dart';
-import 'package:prasa_assist/features/work_orders/repositories/hybrid_work_order_repository.dart';
 
 import '../support/fake_auth_gateway.dart';
 import '../support/test_dependencies.dart';
@@ -164,12 +163,7 @@ void main() {
     );
 
     final controller = builtPage!.controller;
-    expect(controller, isA<ProductionWorkOrdersController>());
-    final production = controller! as ProductionWorkOrdersController;
-    expect(
-      production.productionRepository.hybridRepository,
-      isA<HybridWorkOrderRepository>(),
-    );
+    expect(controller.isHybrid, isTrue);
   });
 
   testWidgets(
@@ -290,12 +284,8 @@ void main() {
         ),
       );
 
-      final controller =
-          builtPage!.workOrdersController as ProductionWorkOrdersController;
-      expect(
-        controller.productionRepository.hybridRepository,
-        isA<HybridWorkOrderRepository>(),
-      );
+      expect(builtPage!.workOrdersController, isNull);
+      expect(builtPage!.onPrepareWorkOrder, isNotNull);
     },
   );
 
@@ -317,66 +307,83 @@ void main() {
         appDatabase: database,
       );
       RecommendationListPage? composition;
+      final prefill = RecommendationWorkOrderPrefillFactory().create(
+        _acceptedMaintenanceRecord(),
+      );
 
       await tester.pumpWidget(
         AppDependenciesScope(
           dependencies: dependencies,
-          child: Builder(
-            builder: (context) {
-              composition =
-                  ModuleRegistry.destinations
-                          .singleWhere(
-                            (destination) =>
-                                destination.id == 'recommendations',
-                          )
-                          .pageBuilder(context)
-                      as RecommendationListPage;
-              return const SizedBox();
-            },
+          child: MaterialApp(
+            home: Builder(
+              builder: (context) {
+                composition =
+                    ModuleRegistry.destinations
+                            .singleWhere(
+                              (destination) =>
+                                  destination.id == 'recommendations',
+                            )
+                            .pageBuilder(context)
+                        as RecommendationListPage;
+                return ElevatedButton(
+                  onPressed: () => composition!.onPrepareWorkOrder!(prefill),
+                  child: const Text('Open work order prefill'),
+                );
+              },
+            ),
           ),
         ),
       );
-
-      final record = _acceptedMaintenanceRecord();
-      final recommendationController = RecommendationController(
-        _FixedRecommendationRepository(record),
-      );
-      await recommendationController.load();
-      final workOrders =
-          composition!.workOrdersController as ProductionWorkOrdersController;
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: RecommendationDetailPage(
-            recommendationId: record.recommendation.id,
-            controller: recommendationController,
-            workOrdersController: workOrders,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('prepareWorkOrderButton')),
-        300,
-      );
+      expect(composition!.workOrdersController, isNull);
+      expect(composition!.onPrepareWorkOrder, isNotNull);
       expect(database.insertCount, 0);
-      await tester.tap(find.byKey(const Key('prepareWorkOrderButton')));
+      await tester.tap(find.text('Open work order prefill'));
       await tester.pumpAndSettle();
 
       expect(find.byType(WorkOrderFormPage), findsOneWidget);
+      final form = tester.widget<WorkOrderFormPage>(
+        find.byType(WorkOrderFormPage),
+      );
+      expect(form.controller.isHybrid, isTrue);
       expect(_fieldText(tester, 'vehicleIdField'), 'B1023');
       expect(_fieldText(tester, 'taskTypeField'), 'Vehicle inspection');
       expect(
         _fieldText(tester, 'descriptionField'),
         contains('confirmed breakdown recommendation'),
       );
-      final form = tester.widget<WorkOrderFormPage>(
-        find.byType(WorkOrderFormPage),
-      );
       expect(form.prefill!.incidentId, 'INC-B1023-300');
       expect(form.prefill!.recommendationId, 'REC-B1023-300');
+      expect(form.prefill!.priority, WorkOrderPriority.high);
+      expect(form.prefill!.notes, contains('AI-generated summary'));
       expect(database.insertCount, 0);
-      expect(workOrders.workOrders, isEmpty);
+
+      await tester.drag(find.byType(ListView).last, const Offset(0, -500));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('saveWorkOrderButton')));
+      await tester.pumpAndSettle();
+      expect(database.insertCount, 1);
+      expect(
+        database.lastInsertValues,
+        containsPair('owner_user_id', '77777777-7777-4777-8777-777777777777'),
+      );
+      expect(
+        database.lastInsertValues,
+        containsPair('incident_id', 'INC-B1023-300'),
+      );
+      expect(
+        database.lastInsertValues,
+        containsPair('recommendation_id', 'REC-B1023-300'),
+      );
+      expect(database.lastInsertValues, containsPair('vehicle_id', 'B1023'));
+      expect(
+        database.lastInsertValues,
+        containsPair('task_type', 'Vehicle inspection'),
+      );
+      expect(database.lastInsertValues, containsPair('priority', 'high'));
+      expect(
+        database.lastInsertValues!['notes'],
+        contains('AI-generated summary'),
+      );
     },
   );
 
@@ -577,6 +584,7 @@ String _fieldText(WidgetTester tester, String key) {
 
 class _RecordingAppDatabase implements AppDatabase {
   int insertCount = 0;
+  Map<String, Object?>? lastInsertValues;
 
   @override
   bool get isOpen => true;
@@ -589,6 +597,17 @@ class _RecordingAppDatabase implements AppDatabase {
 
   @override
   Future<void> close() async {}
+
+  @override
+  Future<int> insert(
+    String table,
+    Map<String, Object?> values, {
+    dynamic conflictAlgorithm,
+  }) async {
+    insertCount++;
+    lastInsertValues = Map<String, Object?>.from(values);
+    return 1;
+  }
 
   @override
   Future<T> transaction<T>(
@@ -623,6 +642,7 @@ class _RecordingAppDatabaseTransaction implements AppDatabaseTransaction {
     dynamic conflictAlgorithm,
   }) async {
     database.insertCount++;
+    database.lastInsertValues = Map<String, Object?>.from(values);
     return 1;
   }
 
@@ -663,34 +683,6 @@ class _CapturingRecommendationRepository implements RecommendationRepository {
       throw UnimplementedError();
 }
 
-class _FixedRecommendationRepository implements RecommendationRepository {
-  _FixedRecommendationRepository(this.record);
-
-  final RecommendationRecordDto record;
-
-  @override
-  Future<List<RecommendationRecordDto>> readAll() async => [record];
-
-  @override
-  Future<RecommendationRecordDto?> readById(String id) async => record;
-
-  @override
-  Future<RecommendationRecordDto> generateAnalysis(String id) async => record;
-
-  @override
-  Future<RecommendationRecordDto> createPending(
-    RecommendationRecordDto record,
-  ) => throw UnimplementedError();
-
-  @override
-  Future<RecommendationRecordDto> decide(
-    String id, {
-    required String decision,
-    String? note,
-    required int expectedVersion,
-  }) async => record;
-}
-
 RecommendationRecordDto _acceptedMaintenanceRecord() {
   final pending = OperationsRecommendation(
     id: 'REC-B1023-300',
@@ -728,6 +720,16 @@ RecommendationRecordDto _acceptedMaintenanceRecord() {
       decisionUserId: '77777777-7777-4777-8777-777777777777',
       decidedAt: DateTime.utc(2026, 8, 31, 1),
       remoteVersion: 2,
+    ),
+    analysis: RecommendationAnalysis(
+      recommendationId: 'REC-B1023-300',
+      modelIdentifier: 'test-explanation-model',
+      schemaVersion: 1,
+      summary: 'Inspect B1023 before returning it to service.',
+      rationale: const ['Confirmed breakdown evidence.'],
+      limitations: const ['Staff inspection is required.'],
+      staffReviewChecklist: const ['Review the vehicle condition.'],
+      generatedAt: DateTime.utc(2026, 8, 31, 0, 30),
     ),
   );
 }
