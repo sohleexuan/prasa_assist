@@ -132,7 +132,10 @@ class HybridWorkOrderRepository implements WorkOrderHybridOperations {
       final pending = await _localDataSource.markPendingPublication(id);
       late final WorkOrderRecordDto confirmed;
       try {
-        confirmed = await _remoteDataSource.create(pending.draft);
+        confirmed = await _remoteDataSource.create(
+          pending.localId,
+          pending.draft,
+        );
       } on WorkOrderConflictException {
         await _localDataSource.markConflict(id, publicationConflictMessage);
         rethrow;
@@ -207,7 +210,6 @@ class HybridWorkOrderRepository implements WorkOrderHybridOperations {
     }
     final updated = await _remoteDataSource.transitionStatus(
       _required(workOrderId, 'Work-order ID'),
-      fromStatus: fromStatus,
       toStatus: toStatus,
       expectedVersion: _version(expectedVersion),
     );

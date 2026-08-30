@@ -90,6 +90,7 @@ void main() {
         expect(fixture.remote.createdDraft, same(draft));
         expect(result.incidentId, 'INC-300');
         expect(result.recommendationId, 'REC-INSPECT-B1023');
+        expect(fixture.remote.publicationKey, local.localId);
         expect(
           fixture.local.cached.single.syncState,
           LocalSyncState.cachedRemote,
@@ -186,7 +187,6 @@ void main() {
         expectedVersion: 3,
       );
 
-      expect(fixture.remote.fromStatus, WorkOrderStatus.assigned);
       expect(fixture.remote.toStatus, WorkOrderStatus.inProgress);
       expect(fixture.remote.expectedVersion, 3);
     });
@@ -218,8 +218,8 @@ class _FakeRemote implements WorkOrderRemoteDataSource {
   WorkOrderRecordDto? updateResult;
   WorkOrderRecordDto? transitionResult;
   LocalWorkOrderDraft? createdDraft;
+  String? publicationKey;
   WorkOrderUpdateInput? updatedInput;
-  WorkOrderStatus? fromStatus;
   WorkOrderStatus? toStatus;
   int? expectedVersion;
   int createCalls = 0;
@@ -238,8 +238,12 @@ class _FakeRemote implements WorkOrderRemoteDataSource {
   }
 
   @override
-  Future<WorkOrderRecordDto> create(LocalWorkOrderDraft draft) async {
+  Future<WorkOrderRecordDto> create(
+    String publicationKey,
+    LocalWorkOrderDraft draft,
+  ) async {
     createCalls++;
+    this.publicationKey = publicationKey;
     createdDraft = draft;
     if (createError case final error?) throw error;
     return createCompleter?.future ?? createResult ?? _confirmed();
@@ -269,12 +273,10 @@ class _FakeRemote implements WorkOrderRemoteDataSource {
   @override
   Future<WorkOrderRecordDto> transitionStatus(
     String workOrderId, {
-    required WorkOrderStatus fromStatus,
     required WorkOrderStatus toStatus,
     required int expectedVersion,
   }) async {
     transitionCalls++;
-    this.fromStatus = fromStatus;
     this.toStatus = toStatus;
     this.expectedVersion = expectedVersion;
     return transitionResult ?? _confirmed(status: toStatus);
