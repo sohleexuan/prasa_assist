@@ -104,8 +104,43 @@ void main() {
       expect(controller.workOrders.single.incidentId, 'INC-1');
       expect(controller.workOrders.single.taskType, 'Safety inspection');
       expect(controller.workOrders.single.priority, WorkOrderPriority.high);
+      expect(
+        controller.workOrders.single.notes,
+        'AI-generated summary: Staff must verify the vehicle.',
+      );
     },
   );
+
+  testWidgets('rapid repeated save taps create at most one local draft', (
+    tester,
+  ) async {
+    final controller = WorkOrdersController(
+      InMemoryWorkOrderRepository(initialWorkOrders: []),
+    );
+    addTearDown(controller.dispose);
+    await controller.load();
+    await tester.pumpWidget(
+      _TestHost(child: WorkOrderFormPage(controller: controller)),
+    );
+    await tester.enterText(find.byKey(const Key('vehicleIdField')), 'B1023');
+    await tester.enterText(
+      find.byKey(const Key('taskTypeField')),
+      'Vehicle inspection',
+    );
+    await tester.enterText(
+      find.byKey(const Key('descriptionField')),
+      'Inspect the Route 300 breakdown.',
+    );
+    await _scrollToBottom(tester);
+
+    final save = find.byKey(const Key('saveWorkOrderButton'));
+    expect(find.text('Save local draft'), findsOneWidget);
+    await tester.tap(save);
+    await tester.tap(save, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(controller.workOrders, hasLength(1));
+  });
 
   test('old non-prefill createDraft calls retain absent linkage', () async {
     final controller = WorkOrdersController(

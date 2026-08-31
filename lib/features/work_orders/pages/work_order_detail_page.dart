@@ -27,10 +27,12 @@ class WorkOrderDetailPage extends StatefulWidget {
 
 class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
   bool _isWorking = false;
+  late String _workOrderId;
 
   @override
   void initState() {
     super.initState();
+    _workOrderId = widget.workOrderId;
     widget.controller.addListener(_refresh);
   }
 
@@ -46,7 +48,7 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final workOrder = widget.controller.findById(widget.workOrderId);
+    final workOrder = widget.controller.findById(_workOrderId);
     return AppPageScaffold(
       title: 'Work order details',
       actions: workOrder == null || workOrder.isTerminal
@@ -192,8 +194,7 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
     if (widget.controller.isLocalDraft(workOrder.workOrderId)) {
       return AppSectionCard(
         title: 'Draft review',
-        subtitle:
-            'Saving keeps this draft on the device. Publish only after staff review confirms that a shared work order should be created.',
+        subtitle: 'Saving keeps this draft on the device. Publish only after staff review confirms that a shared work order should be created.',
         body: FilledButton.icon(
           key: const Key('publishWorkOrderAction'),
           onPressed: _isWorking ? null : () => _confirmPublish(workOrder),
@@ -202,10 +203,18 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
         ),
       );
     }
+    final transitionBlockReason = workOrder.status == WorkOrderStatus.draft
+        ? widget.controller.transitionBlockReason(
+            workOrder,
+            WorkOrderStatus.open,
+          )
+        : null;
     final primary = switch (workOrder.status) {
       WorkOrderStatus.draft => FilledButton.icon(
         key: const Key('openWorkOrderAction'),
-        onPressed: _isWorking ? null : () => _confirmOpen(workOrder),
+        onPressed: _isWorking || transitionBlockReason != null
+            ? null
+            : () => _confirmOpen(workOrder),
         icon: const Icon(Icons.mark_email_read_outlined),
         label: const Text('Open work order'),
       ),
@@ -232,7 +241,9 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
     };
     return AppSectionCard(
       title: 'Staff actions',
-      subtitle: 'Review and explicitly confirm each operational action.',
+      subtitle:
+          transitionBlockReason ??
+          'Review and explicitly confirm each operational action.',
       body: Wrap(
         spacing: AppSpacing.sm,
         runSpacing: AppSpacing.sm,
@@ -272,10 +283,13 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
       confirmLabel: 'Confirm publication',
     );
     if (confirmed) {
-      await _runAction(
+      final published = await _runAction(
         () => widget.controller.publishLocalDraft(workOrder.workOrderId),
         successMessage: 'Work order confirmed by the remote service.',
       );
+      if (published != null && mounted) {
+        setState(() => _workOrderId = published.workOrderId);
+      }
     }
   }
 
@@ -368,32 +382,33 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
     );
   }
 
-  Future<void> _runAction(
+  Future<WorkOrder?> _runAction(
     Future<WorkOrder> Function() action, {
     String successMessage = 'Work order updated by staff.',
   }) async {
     setState(() => _isWorking = true);
     try {
-      await action();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(successMessage)),
-      );
+      final updated = await action();
+      if (!mounted) return null;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(successMessage)));
+      return updated;
     } on WorkOrderValidationException catch (error) {
-      if (!mounted) return;
+      if (!mounted) return null;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(error.message)));
     } on StateError catch (error) {
-      if (!mounted) return;
+      if (!mounted) return null;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(error.message)));
     } on WorkOrderDataException catch (error) {
-      if (!mounted) return;
+      if (!mounted) return null;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(error.message)));
     } finally {
       if (mounted) setState(() => _isWorking = false);
     }
+    return null;
   }
 
   String _format(DateTime? value) {

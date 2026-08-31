@@ -87,29 +87,81 @@ class WorkOrdersController extends ChangeNotifier {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
-    try {
-      if (_hybridOperations == null) {
+    if (_hybridOperations == null) {
+      try {
         _workOrders = await _repository!.readAll();
         _localRecords = const {};
         _readProvenance = null;
-      } else {
-        final confirmed = await _hybridOperations.readAllWithProvenance();
-        final local = await _hybridOperations.readLocalWorkItems();
-        _localRecords = {
-          for (final record in local) record.localId: record,
-        };
-        _workOrders = List.unmodifiable([
-          ...local.map(_toDomain),
-          ...confirmed.data,
-        ]);
-        _readProvenance = confirmed.provenance;
+      } catch (_) {
+        _errorMessage = 'Unable to load work orders.';
+      } finally {
+        _isLoading = false;
+        notifyListeners();
       }
+      return;
+    }
+
+    try {
+      await _loadHybrid();
     } catch (_) {
-      _errorMessage = 'Unable to load work orders. Confirmed records may be unavailable offline.';
+      _errorMessage = 'Unable to load work orders.';
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> _loadHybrid() async {
+    List<LocalWorkOrderRecord> local = const [];
+    WorkOrderReadResult<List<WorkOrder>>? confirmed;
+    Object? localFailure;
+    Object? confirmedFailure;
+
+    try {
+      local = await _hybridOperations!.readLocalWorkItems();
+    } catch (error) {
+      localFailure = error;
+    }
+    try {
+      confirmed = await _hybridOperations!.readAllWithProvenance();
+    } catch (error) {
+      confirmedFailure = error;
+    }
+
+    _localRecords = {for (final record in local) record.localId: record};
+    _workOrders = List.unmodifiable([
+      ...local.map(_toDomain),
+      ...?confirmed?.data,
+    ]);
+    _readProvenance = confirmed?.provenance;
+
+    if (localFailure != null && confirmedFailure != null) {
+      _errorMessage = 'Unable to load local drafts or confirmed work orders.';
+    } else if (localFailure != null) {
+      _errorMessage =
+          'Local drafts are unavailable. Showing confirmed work orders only.';
+    } else if (confirmedFailure != null) {
+      _errorMessage = 'Confirmed work orders are unavailable. Showing owner-scoped local drafts.';
+    }
+  }
+
+  Future<void> retryConfirmedRecords() async {
+    if (_hybridOperations == null) {
+      await load();
+      return;
+    }
+    try {
+      final confirmed = await _hybridOperations.readAllWithProvenance();
+      _workOrders = List.unmodifiable([
+        ..._localRecords.values.map(_toDomain),
+        ...confirmed.data,
+      ]);
+      _readProvenance = confirmed.provenance;
+      _errorMessage = null;
+    } catch (_) {
+      _errorMessage = 'Confirmed work orders are unavailable. Showing owner-scoped local drafts.';
+    }
+    notifyListeners();
   }
 
   WorkOrder? findById(String workOrderId) {
@@ -442,11 +494,24 @@ class WorkOrdersController extends ChangeNotifier {
         'Only a local draft can be published.',
       );
     }
+    late final WorkOrder published;
     try {
-      return await _hybridOperations.publishLocalDraft(local.localId);
-    } finally {
+      published = await _hybridOperations.publishLocalDraft(local.localId);
+    } catch (_) {
       await load();
+      rethrow;
     }
+    await load();
+    if (findById(published.workOrderId) == null) {
+      _workOrders = List.unmodifiable([
+        published,
+        ..._workOrders.where(
+          (workOrder) => workOrder.workOrderId != local.localId,
+        ),
+      ]);
+      notifyListeners();
+    }
+    return published;
   }
 
   Future<WorkOrder> _transitionConfirmed(
@@ -454,6 +519,14 @@ class WorkOrdersController extends ChangeNotifier {
     WorkOrderStatus toStatus,
   ) async {
     final current = await _current(workOrderId);
+    _requireTransition(current, toStatus);
+    if (toStatus != WorkOrderStatus.cancelled) {
+      _validateReady(current);
+    }
+    if (toStatus == WorkOrderStatus.inProgress ||
+        toStatus == WorkOrderStatus.completed) {
+      _validateAssigned(current);
+    }
     final version = _confirmedVersion(current);
     final updated = await _hybridOperations!.transitionConfirmed(
       current.workOrderId,
@@ -466,12 +539,29 @@ class WorkOrdersController extends ChangeNotifier {
   }
 
   int _confirmedVersion(WorkOrder workOrder) {
-    if (isLocalDraft(workOrder.workOrderId) || workOrder.remoteVersion == null) {
+    if (isLocalDraft(workOrder.workOrderId) ||
+        workOrder.remoteVersion == null) {
       throw const WorkOrderValidationException(
         'Publish the local draft before making a confirmed work-order change.',
       );
     }
     return workOrder.remoteVersion!;
+  }
+
+  String? transitionBlockReason(WorkOrder workOrder, WorkOrderStatus toStatus) {
+    try {
+      _requireTransition(workOrder, toStatus);
+      if (toStatus != WorkOrderStatus.cancelled) {
+        _validateReady(workOrder);
+      }
+      if (toStatus == WorkOrderStatus.inProgress ||
+          toStatus == WorkOrderStatus.completed) {
+        _validateAssigned(workOrder);
+      }
+      return null;
+    } on WorkOrderValidationException catch (error) {
+      return error.message;
+    }
   }
 
   WorkOrder _toDomain(LocalWorkOrderRecord record) => WorkOrder(
