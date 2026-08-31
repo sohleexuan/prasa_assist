@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -13,11 +14,65 @@ import 'package:prasa_assist/features/recommendations/domain/recommendation_evid
 import 'package:prasa_assist/features/recommendations/domain/recommendation_status.dart';
 import 'package:prasa_assist/features/recommendations/pages/recommendation_detail_page.dart';
 import 'package:prasa_assist/features/recommendations/pages/recommendation_list_page.dart';
+import 'package:prasa_assist/features/recommendations/repositories/recommendation_data_exception.dart';
 import 'package:prasa_assist/features/recommendations/repositories/recommendation_repository.dart';
+import 'package:prasa_assist/features/recommendations/widgets/recommendation_analysis_panel.dart';
 import 'package:prasa_assist/features/work_orders/models/work_order.dart';
 import 'package:prasa_assist/features/work_orders/models/work_order_prefill.dart';
 
 void main() {
+  test('repeated analysis retry keeps only one request in flight', () async {
+    final repository = _DelayedAnalysisRepository(
+      _acceptedRecord(withAnalysis: false),
+    );
+    final controller = RecommendationController(repository);
+    addTearDown(controller.dispose);
+    await controller.load();
+
+    final first = controller.generateAnalysis('rec-1');
+    final repeated = controller.generateAnalysis('rec-1');
+
+    expect(repository.analysisCalls, 1);
+    repository.analysisCompleter.complete(_acceptedRecord());
+    await Future.wait([first, repeated]);
+    expect(controller.find('rec-1')?.analysis, isNotNull);
+  });
+
+  testWidgets(
+    'analysis server failure stays in the panel without connection wording',
+    (tester) async {
+      const message =
+          'The analysis service could not read or save recommendation data.';
+      final controller = RecommendationController(
+        _FailingAnalysisRepository(
+          _acceptedRecord(withAnalysis: false),
+          const RecommendationServerException(message),
+        ),
+      );
+      addTearDown(controller.dispose);
+      await controller.load();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: RecommendationDetailPage(
+            recommendationId: 'rec-1',
+            controller: controller,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final panel = find.byType(RecommendationAnalysisPanel);
+      expect(
+        find.descendant(of: panel, matching: find.text(message)),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Check the connection'), findsNothing);
+      expect(find.text('Analysis unavailable'), findsOneWidget);
+    },
+  );
+
   testWidgets(
     'accepted maintenance recommendation sends existing prefill only on CTA',
     (tester) async {
@@ -56,9 +111,15 @@ void main() {
       expect(received!.recommendationId, 'rec-1');
       expect(received!.vehicleId, 'B1023');
       expect(received!.taskType, 'Vehicle inspection');
-      expect(received!.description, contains('confirmed breakdown'));
+      expect(
+        received!.description,
+        'Inspect B1023 following the confirmed breakdown recommendation.',
+      );
       expect(received!.priority, WorkOrderPriority.high);
-      expect(received!.notes, contains('AI-generated summary'));
+      expect(
+        received!.notes,
+        'AI-generated summary (review before saving): Review B1023.',
+      );
       expect(find.byType(RecommendationDetailPage), findsOneWidget);
     },
   );
@@ -309,6 +370,7 @@ class _FixedRepository implements RecommendationRepository {
 
 RecommendationRecordDto _acceptedRecord({
   List<RecommendationAction>? actions,
+  bool withAnalysis = true,
 }) => RecommendationRecordDto(
   recommendation: _pendingRecord(actions: actions).recommendation.decide(
     status: RecommendationStatus.accepted,
@@ -316,8 +378,31 @@ RecommendationRecordDto _acceptedRecord({
     decidedAt: DateTime.utc(2026, 8, 29, 1),
     remoteVersion: 2,
   ),
-  analysis: _analysis(),
+  analysis: withAnalysis ? _analysis() : null,
 );
+
+class _FailingAnalysisRepository extends _FixedRepository {
+  _FailingAnalysisRepository(super.record, this.failure);
+
+  final RecommendationDataException failure;
+
+  @override
+  Future<RecommendationRecordDto> generateAnalysis(String id) =>
+      Future.error(failure);
+}
+
+class _DelayedAnalysisRepository extends _FixedRepository {
+  _DelayedAnalysisRepository(super.record);
+
+  final analysisCompleter = Completer<RecommendationRecordDto>();
+  var analysisCalls = 0;
+
+  @override
+  Future<RecommendationRecordDto> generateAnalysis(String id) {
+    analysisCalls++;
+    return analysisCompleter.future;
+  }
+}
 
 RecommendationRecordDto _rejectedRecord({
   List<RecommendationAction>? actions,

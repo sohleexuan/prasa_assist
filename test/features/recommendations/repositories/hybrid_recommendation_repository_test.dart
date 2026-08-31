@@ -27,10 +27,8 @@ void main() {
     remote.failAnalysis = false;
     final saved = await repository.generateAnalysis('rec-1');
     expect(saved.analysis?.modelIdentifier, 'gemini-2.5-flash');
-    await expectLater(
-      repository.generateAnalysis('rec-1'),
-      throwsA(isA<RecommendationValidationException>()),
-    );
+    final existing = await repository.generateAnalysis('rec-1');
+    expect(existing.analysis?.modelIdentifier, 'gemini-2.5-flash');
     expect(remote.analysisCalls, 2);
   });
 

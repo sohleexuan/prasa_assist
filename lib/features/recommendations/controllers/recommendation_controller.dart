@@ -10,11 +10,13 @@ class RecommendationController extends ChangeNotifier {
   List<RecommendationRecordDto> _records = const [];
   bool _loading = false;
   final Set<String> _busy = {};
+  final Map<String, String> _analysisErrors = {};
   String? _error;
 
   List<RecommendationRecordDto> get records => List.unmodifiable(_records);
   bool get isLoading => _loading;
   String? get errorMessage => _error;
+  String? analysisErrorMessage(String id) => _analysisErrors[id];
   bool isBusy(String id) => _busy.contains(id);
   RecommendationRecordDto? find(String id) {
     for (final record in _records) {
@@ -50,10 +52,20 @@ class RecommendationController extends ChangeNotifier {
         _replace(updated);
       });
 
-  Future<void> generateAnalysis(String id) => _operate(id, () async {
-    final updated = await _repository.generateAnalysis(id);
-    _replace(updated);
-  });
+  Future<void> generateAnalysis(String id) async {
+    if (!_busy.add(id)) return;
+    _analysisErrors.remove(id);
+    notifyListeners();
+    try {
+      final updated = await _repository.generateAnalysis(id);
+      _replace(updated);
+    } on RecommendationDataException catch (error) {
+      _analysisErrors[id] = error.safeMessage;
+    } finally {
+      _busy.remove(id);
+      notifyListeners();
+    }
+  }
 
   Future<void> _operate(String id, Future<void> Function() operation) async {
     if (!_busy.add(id)) return;
