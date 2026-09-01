@@ -136,6 +136,7 @@ class _RecommendationDetailPageState extends State<RecommendationDetailPage> {
           RecommendationAnalysisPanel(
             analysis: record.analysis,
             loading: busy && record.analysis == null,
+            errorMessage: widget.controller.analysisErrorMessage(item.id),
             onRetry: busy
                 ? null
                 : () => widget.controller.generateAnalysis(item.id),

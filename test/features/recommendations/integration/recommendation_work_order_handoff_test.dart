@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:prasa_assist/features/recommendations/data/dto/recommendation_record_dto.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation_action.dart';
+import 'package:prasa_assist/features/recommendations/domain/recommendation_analysis.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation_confidence.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation_evidence.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation_status.dart';
@@ -53,11 +54,33 @@ void main() {
       remoteVersion: 2,
     );
     final prefill = const RecommendationWorkOrderPrefillFactory().create(
-      RecommendationRecordDto(recommendation: accepted),
+      RecommendationRecordDto(
+        recommendation: accepted,
+        analysis: RecommendationAnalysis(
+          recommendationId: 'REC-1',
+          modelIdentifier: 'gemini-2.5-flash',
+          schemaVersion: 1,
+          summary: 'Inspect B1023 before returning it to service.',
+          rationale: ['The stored breakdown evidence supports inspection.'],
+          limitations: ['Staff must verify the current vehicle condition.'],
+          staffReviewChecklist: ['Review the stored evidence.'],
+          generatedAt: DateTime.utc(2026, 8, 29, 1, 5),
+        ),
+      ),
     );
     expect(prefill.vehicleId, 'B1023');
     expect(prefill.incidentId, 'INC-1');
     expect(prefill.recommendationId, 'REC-1');
+    expect(prefill.taskType, 'Vehicle inspection');
+    expect(
+      prefill.description,
+      'Inspect B1023 following the confirmed breakdown recommendation.',
+    );
     expect(prefill.priority, WorkOrderPriority.high);
+    expect(
+      prefill.notes,
+      'AI-generated summary (review before saving): '
+      'Inspect B1023 before returning it to service.',
+    );
   });
 }

@@ -8,12 +8,14 @@ class RecommendationAnalysisPanel extends StatelessWidget {
   const RecommendationAnalysisPanel({
     required this.analysis,
     required this.loading,
+    required this.errorMessage,
     required this.onRetry,
     super.key,
   });
 
   final RecommendationAnalysis? analysis;
   final bool loading;
+  final String? errorMessage;
   final VoidCallback? onRetry;
 
   @override
@@ -30,6 +32,13 @@ class RecommendationAnalysisPanel extends StatelessWidget {
           else if (analysis == null) ...[
             const Text('Analysis unavailable'),
             const SizedBox(height: AppSpacing.xs),
+            if (errorMessage != null) ...[
+              Text(
+                errorMessage!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+            ],
             const Text(
               'This does not block staff from accepting or rejecting the recommendation.',
             ),

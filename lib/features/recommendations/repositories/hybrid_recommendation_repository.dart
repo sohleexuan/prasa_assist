@@ -73,9 +73,7 @@ class HybridRecommendationRepository implements RecommendationRepository {
   Future<RecommendationRecordDto> generateAnalysis(String id) async {
     final current = await readById(id);
     if (current?.analysis != null) {
-      throw const RecommendationValidationException(
-        'AI analysis is already saved and cannot be regenerated.',
-      );
+      return current!;
     }
     final record = await _remote.generateAnalysis(id);
     await _local.replaceAll([record], retrievedAt: _clock().toUtc());
