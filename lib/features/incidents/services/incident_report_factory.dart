@@ -1,3 +1,4 @@
+import '../../../core/routes/route_catalog.dart';
 import '../models/incident.dart';
 import '../models/incident_enums.dart';
 import '../models/incident_status_change.dart';
@@ -33,7 +34,7 @@ class IncidentReportFactory {
       incidentType: incidentType,
       title: title.trim(),
       description: description.trim(),
-      routeId: routeId.trim(),
+      routeId: normalizeRouteId(routeId),
       routeName: _optionalText(routeName),
       vehicleId: _optionalText(vehicleId),
       location: location.trim(),
