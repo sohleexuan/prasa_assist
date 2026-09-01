@@ -118,6 +118,7 @@ if (!url || !anonKey || !serviceKey) {
         return { data: null, error };
       },
       () => new Date(),
+      (event) => console.error(JSON.stringify(event)),
     ),
   );
   Deno.serve(handler);
