@@ -295,6 +295,7 @@ void main() {
       final gateway = FakeAuthGateway(
         initialSession: const AuthSession(
           userId: '77777777-7777-4777-8777-777777777777',
+          email: 'maintenance.staff@example.com',
         ),
       );
       final database = _RecordingAppDatabase();
@@ -380,6 +381,10 @@ void main() {
         containsPair('task_type', 'Vehicle inspection'),
       );
       expect(database.lastInsertValues, containsPair('priority', 'high'));
+      expect(
+        database.lastInsertValues,
+        containsPair('created_by_label', 'maintenance.staff@example.com'),
+      );
       expect(
         database.lastInsertValues!['notes'],
         contains('AI-generated summary'),

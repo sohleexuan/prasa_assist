@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:prasa_assist/core/database/local_sync_state.dart';
 import 'package:prasa_assist/core/theme/app_theme.dart';
 import 'package:prasa_assist/features/work_orders/controllers/work_orders_controller.dart';
+import 'package:prasa_assist/features/work_orders/data/dto/local_work_order_draft.dart';
+import 'package:prasa_assist/features/work_orders/data/dto/local_work_order_record.dart';
 import 'package:prasa_assist/features/work_orders/data/in_memory_work_order_repository.dart';
 import 'package:prasa_assist/features/work_orders/models/work_order.dart';
+import 'package:prasa_assist/features/work_orders/models/work_order_read_result.dart';
 import 'package:prasa_assist/features/work_orders/pages/work_order_list_page.dart';
+import 'package:prasa_assist/features/work_orders/repositories/work_order_data_exception.dart';
+import 'package:prasa_assist/features/work_orders/repositories/work_order_hybrid_operations.dart';
 
 void main() {
   testWidgets('shows the supplied work-order scenario and opens its details', (
@@ -50,6 +56,49 @@ void main() {
     expect(find.text('No work orders'), findsOneWidget);
     expect(find.text('Create work order'), findsOneWidget);
   });
+
+  testWidgets(
+    'remote failure shows the authenticated owner draft as a partial list',
+    (tester) async {
+      final operations = _OwnerOfflineOperations();
+      final controller = WorkOrdersController.hybrid(
+        operations,
+        localDraftCreatedByLabel: 'cloud.staff@example.com',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _TestHost(child: WorkOrderListPage(controller: controller)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Unable to load work orders'), findsOneWidget);
+
+      await controller.createDraft(
+        vehicleId: 'B1023',
+        taskType: 'Vehicle inspection',
+        description: 'Inspect the Route 300 breakdown.',
+        priority: WorkOrderPriority.high,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('B1023'), findsWidgets);
+      expect(find.textContaining('Route 300'), findsOneWidget);
+      expect(find.text('Unable to load work orders'), findsNothing);
+      expect(
+        find.textContaining('Showing owner-scoped local drafts'),
+        findsOneWidget,
+      );
+      expect(operations.createdOwnerIds, [operations.authenticatedOwnerId]);
+
+      operations.failRemoteReads = false;
+      await tester.tap(find.byKey(const Key('retryConfirmedWorkOrders')));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('B1023'), findsWidgets);
+      expect(find.textContaining('Route 300'), findsOneWidget);
+      expect(find.byKey(const Key('retryConfirmedWorkOrders')), findsNothing);
+    },
+  );
 
   testWidgets('remains overflow-free on a narrow viewport', (tester) async {
     tester.view.physicalSize = const Size(320, 568);
@@ -113,6 +162,53 @@ void main() {
     expect(find.text('B2040 · Brake repair'), findsOneWidget);
     expect(find.text('B1023 · Vehicle inspection'), findsNothing);
   });
+}
+
+class _OwnerOfflineOperations extends Fake
+    implements WorkOrderHybridOperations {
+  final authenticatedOwnerId = '33333333-3333-4333-8333-333333333333';
+  final List<LocalWorkOrderRecord> _local = [];
+  final List<String> createdOwnerIds = [];
+  bool failRemoteReads = true;
+
+  @override
+  Future<List<LocalWorkOrderRecord>> readLocalWorkItems() async =>
+      List.unmodifiable(_local);
+
+  @override
+  Future<WorkOrderReadResult<List<WorkOrder>>> readAllWithProvenance() async {
+    if (failRemoteReads) {
+      throw const WorkOrderOfflineException(
+        'The confirmed work-order service is unavailable.',
+      );
+    }
+    return WorkOrderReadResult(
+      data: const [],
+      provenance: WorkOrderReadProvenance(
+        source: WorkOrderReadSource.liveSupabase,
+        retrievedAtUtc: DateTime.utc(2026, 8, 31),
+      ),
+    );
+  }
+
+  @override
+  Future<LocalWorkOrderRecord> createLocalDraft(
+    LocalWorkOrderDraft draft,
+  ) async {
+    createdOwnerIds.add(authenticatedOwnerId);
+    final record = LocalWorkOrderRecord(
+      localId: 'owner-local-${_local.length + 1}',
+      ownerUserId: authenticatedOwnerId,
+      createdByUserId: authenticatedOwnerId,
+      draft: draft,
+      status: WorkOrderStatus.draft,
+      syncState: LocalSyncState.localDraft,
+      localCreatedAt: DateTime.utc(2026, 8, 31),
+      localModifiedAt: DateTime.utc(2026, 8, 31),
+    );
+    _local.add(record);
+    return record;
+  }
 }
 
 WorkOrdersController _controllerWithTwoRecords() {

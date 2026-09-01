@@ -6,6 +6,7 @@ import '../../../shared/widgets/app_page_scaffold.dart';
 import '../controllers/work_orders_controller.dart';
 import '../models/work_order.dart';
 import '../models/work_order_prefill.dart';
+import '../repositories/work_order_data_exception.dart';
 
 class WorkOrderFormPage extends StatefulWidget {
   const WorkOrderFormPage({
@@ -191,7 +192,7 @@ class _WorkOrderFormPageState extends State<WorkOrderFormPage> {
                       FilledButton(
                         key: const Key('saveWorkOrderButton'),
                         onPressed: _saving ? null : _save,
-                        child: Text(_saving ? 'Saving…' : 'Review and save'),
+                        child: Text(_saving ? 'Saving…' : 'Save local draft'),
                       ),
                     ];
                     return compact
@@ -272,6 +273,7 @@ class _WorkOrderFormPageState extends State<WorkOrderFormPage> {
   }
 
   Future<void> _save() async {
+    if (_saving) return;
     if (!_formKey.currentState!.validate() || !_validateSchedule()) return;
     setState(() => _saving = true);
     try {
@@ -297,10 +299,14 @@ class _WorkOrderFormPageState extends State<WorkOrderFormPage> {
           scheduledStart: _scheduledStart,
           scheduledEnd: _scheduledEnd,
           notes: _notes.text,
-          createdBy: 'Current operations staff',
         );
       }
       if (mounted) Navigator.of(context).pop(true);
+    } on WorkOrderDataException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.message)));
+      setState(() => _saving = false);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

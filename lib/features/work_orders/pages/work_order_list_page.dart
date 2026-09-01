@@ -86,11 +86,24 @@ class _WorkOrderListPageState extends State<WorkOrderListPage> {
               AppSpacing.md,
               0,
             ),
-            child: Text(
-              _sourceMessage(),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSecondaryContainer,
-              ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _sourceMessage(),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                    ),
+                  ),
+                ),
+                if (_controller.errorMessage != null &&
+                    _controller.workOrders.isNotEmpty)
+                  TextButton(
+                    key: const Key('retryConfirmedWorkOrders'),
+                    onPressed: _controller.retryConfirmedRecords,
+                    child: const Text('Retry confirmed'),
+                  ),
+              ],
             ),
           ),
           Padding(
@@ -167,11 +180,9 @@ class _WorkOrderListPageState extends State<WorkOrderListPage> {
 
   Widget _buildContent() {
     if (_controller.isLoading) {
-      return const AppLoadingIndicator(
-        message: 'Loading work orders',
-      );
+      return const AppLoadingIndicator(message: 'Loading work orders');
     }
-    if (_controller.errorMessage != null) {
+    if (_controller.errorMessage != null && _controller.workOrders.isEmpty) {
       return AppErrorState(
         title: 'Unable to load work orders',
         message: _controller.errorMessage!,
@@ -219,14 +230,22 @@ class _WorkOrderListPageState extends State<WorkOrderListPage> {
   }
 
   Future<void> _create() async {
-    await Navigator.of(context).push<bool>(
+    final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => WorkOrderFormPage(controller: _controller),
       ),
     );
+    if (saved == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Local work-order draft saved.')),
+      );
+    }
   }
 
   String _sourceMessage() {
+    if (_controller.errorMessage != null && _controller.workOrders.isNotEmpty) {
+      return '${_controller.errorMessage} Local drafts remain on this device until staff explicitly publish them. AI recommends. Staff decides.';
+    }
     final provenance = _controller.readProvenance;
     if (provenance == null) {
       return 'Draft records stay on this device until staff explicitly publish them. AI recommends. Staff decides.';

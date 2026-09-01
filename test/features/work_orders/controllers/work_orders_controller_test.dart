@@ -279,56 +279,182 @@ void main() {
     },
   );
 
-  test('hybrid drafts save locally and publish only when staff requests it', () async {
-    final operations = _HybridOperationsFake();
+  test(
+    'hybrid drafts save locally and publish only when staff requests it',
+    () async {
+      final operations = _HybridOperationsFake();
+      final controller = WorkOrdersController.hybrid(operations);
+      addTearDown(controller.dispose);
+
+      await controller.load();
+      expect(operations.publicationCalls, 0);
+
+      final draft = await controller.createDraft(
+        incidentId: 'INC-B1023',
+        recommendationId: 'REC-B1023',
+        vehicleId: ' B1023 ',
+        taskType: ' Inspection ',
+        description: ' Inspect Route 300 breakdown ',
+        priority: WorkOrderPriority.urgent,
+      );
+      expect(operations.createDraftCalls, 1);
+      expect(draft.incidentId, 'INC-B1023');
+      expect(draft.recommendationId, 'REC-B1023');
+      expect(operations.publicationCalls, 0);
+
+      final confirmed = await controller.publishLocalDraft(draft.workOrderId);
+      expect(operations.publicationCalls, 1);
+      expect(operations.publicationKeys, ['local-1']);
+      expect(confirmed.remoteVersion, 1);
+    },
+  );
+
+  test(
+    'remote list failure keeps an authenticated owner local draft visible',
+    () async {
+      final operations = _HybridOperationsFake(failRemoteReads: true);
+      final controller = WorkOrdersController.hybrid(
+        operations,
+        localDraftCreatedByLabel: 'cloud.staff@example.com',
+      );
+      addTearDown(controller.dispose);
+
+      await controller.load();
+      final saved = await controller.createDraft(
+        vehicleId: 'B1023',
+        taskType: 'Vehicle inspection',
+        description: 'Inspect the Route 300 breakdown.',
+        priority: WorkOrderPriority.high,
+        notes: 'Advisory note supplied by the accepted recommendation.',
+      );
+
+      expect(controller.visibleWorkOrders, [saved]);
+      expect(saved.createdBy, 'cloud.staff@example.com');
+      expect(
+        saved.notes,
+        'Advisory note supplied by the accepted recommendation.',
+      );
+      expect(controller.isLocalDraft(saved.workOrderId), isTrue);
+      expect(
+        controller.errorMessage,
+        'Confirmed work orders are unavailable. Showing owner-scoped local drafts.',
+      );
+
+      operations.failRemoteReads = false;
+      operations.confirmed.add(_confirmedRecord());
+      await controller.retryConfirmedRecords();
+
+      expect(controller.errorMessage, isNull);
+      expect(controller.visibleWorkOrders, contains(saved));
+      expect(
+        controller.visibleWorkOrders.map((record) => record.workOrderId),
+        contains('WO-20260831-000001'),
+      );
+    },
+  );
+
+  test('publication result replaces the stale local identity', () async {
+    final operations = _HybridOperationsFake(failRemoteReads: true);
     final controller = WorkOrdersController.hybrid(operations);
     addTearDown(controller.dispose);
-
     await controller.load();
-    expect(operations.publicationCalls, 0);
-
-    final draft = await controller.createDraft(
-      incidentId: 'INC-B1023',
-      recommendationId: 'REC-B1023',
-      vehicleId: ' B1023 ',
-      taskType: ' Inspection ',
-      description: ' Inspect Route 300 breakdown ',
-      priority: WorkOrderPriority.urgent,
+    final local = await controller.createDraft(
+      incidentId: 'INC-20260831-000004',
+      recommendationId: '460d90f1-d4f1-451f-ac69-761dc972b652',
+      vehicleId: 'B1023',
+      taskType: 'Vehicle inspection',
+      description: 'Inspect the Route 300 breakdown.',
+      priority: WorkOrderPriority.high,
+      notes: 'Review the advisory evidence before starting work.',
     );
-    expect(operations.createDraftCalls, 1);
-    expect(draft.incidentId, 'INC-B1023');
-    expect(draft.recommendationId, 'REC-B1023');
-    expect(operations.publicationCalls, 0);
 
-    final confirmed = await controller.publishLocalDraft(draft.workOrderId);
-    expect(operations.publicationCalls, 1);
-    expect(operations.publicationKeys, ['local-1']);
-    expect(confirmed.remoteVersion, 1);
+    final published = await controller.publishLocalDraft(local.workOrderId);
+
+    expect(published.workOrderId, 'WO-20260831-000001');
+    expect(controller.findById(local.workOrderId), isNull);
+    expect(controller.findById(published.workOrderId), published);
+    expect(published.incidentId, 'INC-20260831-000004');
+    expect(published.recommendationId, '460d90f1-d4f1-451f-ac69-761dc972b652');
+    expect(
+      published.notes,
+      'Review the advisory evidence before starting work.',
+    );
+    expect(operations.publicationKeys, [local.workOrderId]);
   });
+
+  test(
+    'Open requires schedule and forwards current expected version',
+    () async {
+      final unscheduled = _confirmedRecord(includeSchedule: false);
+      final operations = _HybridOperationsFake(confirmed: [unscheduled]);
+      final controller = WorkOrdersController.hybrid(operations);
+      addTearDown(controller.dispose);
+      await controller.load();
+
+      await expectLater(
+        controller.openWorkOrder(unscheduled.workOrderId),
+        throwsA(isA<WorkOrderValidationException>()),
+      );
+      expect(operations.transitionCalls, 0);
+
+      final scheduledOperations = _HybridOperationsFake(
+        confirmed: [_confirmedRecord()],
+      );
+      final scheduledController = WorkOrdersController.hybrid(
+        scheduledOperations,
+      );
+      addTearDown(scheduledController.dispose);
+      await scheduledController.load();
+      await scheduledController.openWorkOrder('WO-20260831-000001');
+
+      expect(scheduledOperations.transitionCalls, 1);
+      expect(scheduledOperations.lastExpectedVersion, 1);
+      expect(scheduledOperations.lastTransitionTarget, WorkOrderStatus.open);
+    },
+  );
 }
 
 class _HybridOperationsFake implements WorkOrderHybridOperations {
+  _HybridOperationsFake({
+    this.failRemoteReads = false,
+    List<WorkOrder> confirmed = const [],
+  }) : _confirmed = [...confirmed];
+
+  bool failRemoteReads;
   final List<LocalWorkOrderRecord> _local = [];
+  final List<WorkOrder> _confirmed;
+  List<WorkOrder> get confirmed => _confirmed;
   int createDraftCalls = 0;
   int publicationCalls = 0;
+  int transitionCalls = 0;
+  int? lastExpectedVersion;
+  WorkOrderStatus? lastTransitionTarget;
   final List<String> publicationKeys = [];
 
   @override
-  Future<WorkOrderReadResult<List<WorkOrder>>> readAllWithProvenance() async =>
-      WorkOrderReadResult(
-        data: const [],
-        provenance: WorkOrderReadProvenance(
-          source: WorkOrderReadSource.liveSupabase,
-          retrievedAtUtc: DateTime.utc(2026, 8, 30),
-        ),
+  Future<WorkOrderReadResult<List<WorkOrder>>> readAllWithProvenance() async {
+    if (failRemoteReads) {
+      throw const WorkOrderOfflineException(
+        'The confirmed work-order service is unavailable.',
       );
+    }
+    return WorkOrderReadResult(
+      data: List.unmodifiable(_confirmed),
+      provenance: WorkOrderReadProvenance(
+        source: WorkOrderReadSource.liveSupabase,
+        retrievedAtUtc: DateTime.utc(2026, 8, 30),
+      ),
+    );
+  }
 
   @override
   Future<List<LocalWorkOrderRecord>> readLocalWorkItems() async =>
       List.unmodifiable(_local);
 
   @override
-  Future<LocalWorkOrderRecord> createLocalDraft(LocalWorkOrderDraft draft) async {
+  Future<LocalWorkOrderRecord> createLocalDraft(
+    LocalWorkOrderDraft draft,
+  ) async {
     createDraftCalls++;
     final record = LocalWorkOrderRecord(
       localId: 'local-$createDraftCalls',
@@ -348,34 +474,71 @@ class _HybridOperationsFake implements WorkOrderHybridOperations {
   Future<WorkOrder> publishLocalDraft(String localId) async {
     publicationCalls++;
     publicationKeys.add(localId);
-    _local.removeWhere((record) => record.localId == localId);
-    return WorkOrder(
-      workOrderId: 'WO-000001',
-      incidentId: 'INC-B1023',
-      recommendationId: 'REC-B1023',
-      vehicleId: 'B1023',
-      taskType: 'Inspection',
-      description: 'Inspect Route 300 breakdown',
-      priority: WorkOrderPriority.urgent,
+    final local = _local.singleWhere((record) => record.localId == localId);
+    _local.remove(local);
+    final published = WorkOrder(
+      workOrderId: 'WO-20260831-000001',
+      incidentId: local.draft.incidentId,
+      recommendationId: local.draft.recommendationId,
+      vehicleId: local.draft.vehicleId,
+      taskType: local.draft.taskType,
+      description: local.draft.description,
+      priority: local.draft.priority,
+      scheduledStart: local.draft.scheduledStart,
+      scheduledEnd: local.draft.scheduledEnd,
       status: WorkOrderStatus.draft,
+      notes: local.draft.notes,
       createdByUserId: '11111111-1111-4111-8111-111111111111',
       createdBy: 'staff@example.test',
       createdAt: DateTime.utc(2026, 8, 30),
       updatedAt: DateTime.utc(2026, 8, 30),
       remoteVersion: 1,
     );
+    _confirmed.add(published);
+    return published;
   }
 
   @override
-  Future<LocalWorkOrderRecord> updateLocalDraft(String localId, LocalWorkOrderDraft draft) => throw UnimplementedError();
+  Future<LocalWorkOrderRecord> updateLocalDraft(
+    String localId,
+    LocalWorkOrderDraft draft,
+  ) => throw UnimplementedError();
   @override
   Future<void> discardLocalDraft(String localId) => throw UnimplementedError();
   @override
-  Future<WorkOrder> updateConfirmed(String workOrderId, WorkOrderUpdateInput input, {required int expectedVersion}) => throw UnimplementedError();
+  Future<WorkOrder> updateConfirmed(
+    String workOrderId,
+    WorkOrderUpdateInput input, {
+    required int expectedVersion,
+  }) => throw UnimplementedError();
   @override
-  Future<WorkOrder> assignConfirmed(String workOrderId, {required String assignedTo, required int expectedVersion}) => throw UnimplementedError();
+  Future<WorkOrder> assignConfirmed(
+    String workOrderId, {
+    required String assignedTo,
+    required int expectedVersion,
+  }) => throw UnimplementedError();
   @override
-  Future<WorkOrder> transitionConfirmed(String workOrderId, {required WorkOrderStatus fromStatus, required WorkOrderStatus toStatus, required int expectedVersion}) => throw UnimplementedError();
+  Future<WorkOrder> transitionConfirmed(
+    String workOrderId, {
+    required WorkOrderStatus fromStatus,
+    required WorkOrderStatus toStatus,
+    required int expectedVersion,
+  }) async {
+    transitionCalls++;
+    lastExpectedVersion = expectedVersion;
+    lastTransitionTarget = toStatus;
+    final index = _confirmed.indexWhere(
+      (record) => record.workOrderId == workOrderId,
+    );
+    final updated = _confirmed[index].copyWith(
+      status: toStatus,
+      updatedAt: _confirmed[index].updatedAt.add(const Duration(minutes: 1)),
+      remoteVersion: expectedVersion + 1,
+    );
+    _confirmed[index] = updated;
+    return updated;
+  }
+
   @override
   Future<LocalWorkOrderRecord?> readLocalWorkItem(String localId) async {
     for (final record in _local) {
@@ -383,9 +546,28 @@ class _HybridOperationsFake implements WorkOrderHybridOperations {
     }
     return null;
   }
+
   @override
-  Future<WorkOrderReadResult<WorkOrder?>> readWithProvenance(String workOrderId) => throw UnimplementedError();
+  Future<WorkOrderReadResult<WorkOrder?>> readWithProvenance(
+    String workOrderId,
+  ) => throw UnimplementedError();
 }
+
+WorkOrder _confirmedRecord({bool includeSchedule = true}) => WorkOrder(
+  workOrderId: 'WO-20260831-000001',
+  vehicleId: 'B1023',
+  taskType: 'Vehicle inspection',
+  description: 'Inspect the Route 300 breakdown.',
+  priority: WorkOrderPriority.high,
+  scheduledStart: includeSchedule ? DateTime.utc(2026, 8, 31, 10) : null,
+  scheduledEnd: includeSchedule ? DateTime.utc(2026, 8, 31, 11) : null,
+  status: WorkOrderStatus.draft,
+  createdByUserId: '11111111-1111-4111-8111-111111111111',
+  createdBy: 'staff@example.test',
+  createdAt: DateTime.utc(2026, 8, 31, 9),
+  updatedAt: DateTime.utc(2026, 8, 31, 9),
+  remoteVersion: 1,
+);
 
 WorkOrder _readyRecord({
   String workOrderId = 'WO-1',

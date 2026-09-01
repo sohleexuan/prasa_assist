@@ -24,6 +24,10 @@ void main() {
         expect(payload, isNot(contains('created_by_label')));
         expect(payload['incident_id'], 'INC-B1023-ROUTE-300');
         expect(payload['recommendation_id'], 'REC-INSPECT-B1023');
+        expect(
+          payload['notes'],
+          'Advisory note supplied by the accepted recommendation.',
+        );
         expect(result.createdByLabel, 'server.staff@example.com');
       },
     );
@@ -136,6 +140,7 @@ LocalWorkOrderDraft _draft() => LocalWorkOrderDraft(
   taskType: 'Inspection',
   description: 'Inspect Bus B1023 after its Route 300 breakdown.',
   priority: WorkOrderPriority.urgent,
+  notes: 'Advisory note supplied by the accepted recommendation.',
   createdByLabel: 'non-authoritative local label',
 );
 
