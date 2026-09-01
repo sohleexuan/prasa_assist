@@ -1,5 +1,5 @@
 begin;
-select plan(8);
+select plan(17);
 select has_table('public', 'recommendations', 'recommendations table exists');
 select has_table('public', 'recommendation_analyses', 'analysis table exists');
 select col_is_pk('public', 'recommendation_analyses', 'recommendation_id', 'one analysis per recommendation');
@@ -8,5 +8,14 @@ select policies_are('public', 'recommendation_analyses', array['recommendation_a
 select function_returns('public', 'decide_recommendation', array['uuid','text','text','bigint'], 'recommendations');
 select col_has_check('public', 'recommendations', 'status', 'status is constrained');
 select col_has_check('public', 'recommendations', 'score', 'score is constrained');
+select ok(has_schema_privilege('service_role', 'public', 'USAGE'), 'service_role has USAGE on public schema');
+select ok(has_table_privilege('service_role', 'public.recommendations', 'SELECT'), 'service_role can SELECT recommendations');
+select ok(not has_table_privilege('service_role', 'public.recommendations', 'INSERT'), 'service_role cannot INSERT recommendations');
+select ok(not has_table_privilege('service_role', 'public.recommendations', 'UPDATE'), 'service_role cannot UPDATE recommendations');
+select ok(not has_table_privilege('service_role', 'public.recommendations', 'DELETE'), 'service_role cannot DELETE recommendations');
+select ok(has_table_privilege('service_role', 'public.recommendation_analyses', 'SELECT'), 'service_role can SELECT recommendation analyses');
+select ok(has_table_privilege('service_role', 'public.recommendation_analyses', 'INSERT'), 'service_role can INSERT recommendation analyses');
+select ok(not has_table_privilege('service_role', 'public.recommendation_analyses', 'UPDATE'), 'service_role cannot UPDATE recommendation analyses');
+select ok(not has_table_privilege('service_role', 'public.recommendation_analyses', 'DELETE'), 'service_role cannot DELETE recommendation analyses');
 select * from finish();
 rollback;
