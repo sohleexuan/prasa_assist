@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/routes/bundled_route_catalog_repository.dart';
+import '../../../core/routes/route_catalog.dart';
+import '../../../core/routes/route_catalog_repository.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
 import '../../../shared/widgets/app_section_card.dart';
@@ -22,6 +25,7 @@ class IncidentReportPage extends StatefulWidget {
     this.clock,
     this.incidentIdGenerator,
     this.existingIncident,
+    this.routeCatalogRepository,
     super.key,
   });
 
@@ -32,6 +36,7 @@ class IncidentReportPage extends StatefulWidget {
   final DateTime Function()? clock;
   final IncidentIdGenerator? incidentIdGenerator;
   final Incident? existingIncident;
+  final RouteCatalogRepository? routeCatalogRepository;
 
   @override
   State<IncidentReportPage> createState() => _IncidentReportPageState();
@@ -59,6 +64,12 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
   bool _isSubmitting = false;
   String? _reportedAtError;
   String? _submissionError;
+  RouteCatalogSnapshot? _routeCatalogCache;
+  Future<RouteCatalogSnapshot>? _routeCatalogLoad;
+  _IncidentRouteLookupState _routeLookupState =
+      _IncidentRouteLookupState.initial;
+  String? _routeLookupMessage;
+  int _routeLookupRequest = 0;
 
   bool get _isEditMode => widget.existingIncident != null;
 
@@ -96,6 +107,7 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
       text: existing?.description ?? '',
     );
     _routeIdController = TextEditingController(text: existing?.routeId ?? '');
+    _routeIdController.addListener(_handleRouteIdChanged);
     _routeNameController = TextEditingController(
       text: existing?.routeName ?? '',
     );
@@ -107,6 +119,7 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
 
   @override
   void dispose() {
+    _routeIdController.removeListener(_handleRouteIdChanged);
     _incidentIdController.dispose();
     _titleController.dispose();
     _descriptionController.dispose();
@@ -287,8 +300,8 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
                 AppSectionCard(
                   title: 'Affected service',
                   subtitle:
-                      'Route and vehicle values are staff-entered in Phase 1; '
-                      'they are not validated against live GTFS data.',
+                      'Route names can be checked against cached government '
+                      'static data. Staff may still correct them manually.',
                   leading: const Icon(Icons.route_outlined),
                   body: Column(
                     children: [
@@ -312,9 +325,66 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
                           textInputAction: TextInputAction.next,
                           decoration: const InputDecoration(
                             labelText: 'Route Name (optional)',
+                            helperText: 'Editable after lookup',
                           ),
                         ),
                       ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          key: const ValueKey('incident-route-lookup-button'),
+                          onPressed:
+                              _canEdit &&
+                                  _routeLookupState !=
+                                      _IncidentRouteLookupState.loading &&
+                                  normalizeRouteId(_routeIdController.text)
+                                      .isNotEmpty
+                              ? _lookUpRoute
+                              : null,
+                          icon:
+                              _routeLookupState ==
+                                  _IncidentRouteLookupState.loading
+                              ? const SizedBox.square(
+                                  dimension: 16,
+                                  child: CircularProgressIndicator(
+                                    key: ValueKey(
+                                      'incident-route-lookup-progress',
+                                    ),
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.search_outlined),
+                          label: Text(
+                            _routeLookupState ==
+                                    _IncidentRouteLookupState.loading
+                                ? 'Looking Up Route…'
+                                : 'Look Up Route',
+                          ),
+                        ),
+                      ),
+                      if (_routeLookupMessage != null) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            _routeLookupMessage!,
+                            key: ValueKey(
+                              'incident-route-lookup-${_routeLookupState.name}',
+                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color:
+                                      _routeLookupState ==
+                                          _IncidentRouteLookupState.unavailable
+                                      ? Theme.of(context).colorScheme.error
+                                      : Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: AppSpacing.sm),
                       TextFormField(
                         key: const ValueKey('incident-vehicle-id-field'),
@@ -528,7 +598,7 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
             incidentType: _incidentType,
             title: _titleController.text.trim(),
             description: _descriptionController.text.trim(),
-            routeId: _routeIdController.text.trim(),
+            routeId: normalizeRouteId(_routeIdController.text),
             routeName: _optionalText(_routeNameController.text),
             vehicleId: _optionalText(_vehicleIdController.text),
             location: _locationController.text.trim(),
@@ -569,6 +639,92 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
         }
       }
     }
+  }
+
+  void _handleRouteIdChanged() {
+    _routeLookupRequest++;
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _routeLookupState = _IncidentRouteLookupState.initial;
+      _routeLookupMessage = null;
+    });
+  }
+
+  Future<void> _lookUpRoute() async {
+    final normalizedRouteId = normalizeRouteId(_routeIdController.text);
+    if (normalizedRouteId.isEmpty || !_canEdit) {
+      return;
+    }
+    if (_routeIdController.text != normalizedRouteId) {
+      _routeIdController.value = TextEditingValue(
+        text: normalizedRouteId,
+        selection: TextSelection.collapsed(offset: normalizedRouteId.length),
+      );
+    }
+    final request = ++_routeLookupRequest;
+    setState(() {
+      _routeLookupState = _IncidentRouteLookupState.loading;
+      _routeLookupMessage = null;
+    });
+
+    try {
+      final catalog = await _loadRouteCatalog();
+      if (!mounted ||
+          request != _routeLookupRequest ||
+          normalizeRouteId(_routeIdController.text) != normalizedRouteId) {
+        return;
+      }
+      final route = catalog.routeByShortName(normalizedRouteId);
+      if (route == null) {
+        setState(() {
+          _routeLookupState = _IncidentRouteLookupState.notFound;
+          _routeLookupMessage =
+              'No cached government route was found for $normalizedRouteId. '
+              'You can enter Route Name manually.';
+        });
+        return;
+      }
+      _routeNameController.text = route.routeLongName;
+      setState(() {
+        _routeLookupState = _IncidentRouteLookupState.found;
+        _routeLookupMessage =
+            '${route.routeShortName}: ${route.routeLongName} '
+            '(cached government static data).';
+      });
+    } catch (_) {
+      _routeCatalogLoad = null;
+      if (!mounted ||
+          request != _routeLookupRequest ||
+          normalizeRouteId(_routeIdController.text) != normalizedRouteId) {
+        return;
+      }
+      setState(() {
+        _routeLookupState = _IncidentRouteLookupState.unavailable;
+        _routeLookupMessage =
+            'Route lookup is unavailable. Retry, or enter Route Name manually.';
+      });
+    }
+  }
+
+  Future<RouteCatalogSnapshot> _loadRouteCatalog() {
+    final cached = _routeCatalogCache;
+    if (cached != null) {
+      return Future.value(cached);
+    }
+    final pending = _routeCatalogLoad;
+    if (pending != null) {
+      return pending;
+    }
+    final repository =
+        widget.routeCatalogRepository ?? const BundledRouteCatalogRepository();
+    final load = repository.loadCatalog().then((catalog) {
+      _routeCatalogCache = catalog;
+      return catalog;
+    });
+    _routeCatalogLoad = load;
+    return load;
   }
 
   Future<void> _pickDate() async {
@@ -654,6 +810,14 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
       value.minute,
     );
   }
+}
+
+enum _IncidentRouteLookupState {
+  initial,
+  loading,
+  found,
+  notFound,
+  unavailable,
 }
 
 class _DelayPreview extends StatelessWidget {

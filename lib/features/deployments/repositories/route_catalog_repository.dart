@@ -1,5 +1,1 @@
-import '../models/route_catalog.dart';
-
-abstract interface class RouteCatalogRepository {
-  Future<RouteCatalogSnapshot> loadCatalog();
-}
+export '../../../core/routes/route_catalog_repository.dart';
