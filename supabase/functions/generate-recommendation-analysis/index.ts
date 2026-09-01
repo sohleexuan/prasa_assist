@@ -1,16 +1,15 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { buildGeminiPrompt, parseAnalysis } from "./analysis_contract.ts";
 import {
   AnalysisDependencies,
   createAnalysisHandler,
-  ProviderError,
   SavedAnalysis,
 } from "./handler.ts";
+import { createGroqGenerator } from "./groq_provider.ts";
 
 const url = Deno.env.get("SUPABASE_URL");
 const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-const geminiKey = Deno.env.get("GEMINI_API_KEY");
+const groqKey = Deno.env.get("GROQ_API_KEY");
 
 if (!url || !anonKey || !serviceKey) {
   Deno.serve(() =>
@@ -28,6 +27,7 @@ if (!url || !anonKey || !serviceKey) {
   const admin = createClient(url, serviceKey, {
     auth: { persistSession: false },
   });
+  const generate = createGroqGenerator({ apiKey: groqKey });
   const handler = createAnalysisHandler(
     new AnalysisDependencies(
       async (authorization) => {
@@ -58,59 +58,7 @@ if (!url || !anonKey || !serviceKey) {
           .maybeSingle();
         return { data, error };
       },
-      async (recommendation) => {
-        if (!geminiKey) throw new ProviderError("unavailable");
-        let provider: Response;
-        try {
-          provider = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${
-              encodeURIComponent(geminiKey)
-            }`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contents: [{
-                  parts: [{ text: buildGeminiPrompt(recommendation) }],
-                }],
-                generationConfig: {
-                  temperature: 0.1,
-                  responseMimeType: "application/json",
-                  responseSchema: {
-                    type: "OBJECT",
-                    required: exactResponseFields,
-                    properties: {
-                      summary: { type: "STRING" },
-                      rationale: { type: "ARRAY", items: { type: "STRING" } },
-                      limitations: { type: "ARRAY", items: { type: "STRING" } },
-                      staffReviewChecklist: {
-                        type: "ARRAY",
-                        items: { type: "STRING" },
-                      },
-                    },
-                  },
-                },
-              }),
-            },
-          );
-        } catch {
-          throw new ProviderError("unavailable");
-        }
-        if (!provider.ok) throw new ProviderError("unavailable");
-        try {
-          const response = await provider.json();
-          const raw = response?.candidates?.[0]?.content?.parts?.[0]?.text;
-          return parseAnalysis(raw, {
-            allowedIdentifiers: [
-              recommendation.vehicle_id,
-              recommendation.route_id,
-            ]
-              .filter((value): value is string => Boolean(value)),
-          });
-        } catch {
-          throw new ProviderError("invalid_response");
-        }
-      },
+      generate,
       async (analysis: SavedAnalysis) => {
         const { error } = await admin.from("recommendation_analyses").insert(
           analysis,
@@ -123,10 +71,3 @@ if (!url || !anonKey || !serviceKey) {
   );
   Deno.serve(handler);
 }
-
-const exactResponseFields = [
-  "summary",
-  "rationale",
-  "limitations",
-  "staffReviewChecklist",
-];

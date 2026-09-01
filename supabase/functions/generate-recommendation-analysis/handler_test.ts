@@ -7,6 +7,7 @@ import type {
   SavedAnalysis,
   ServerErrorEvent,
 } from "./handler.ts";
+import { GroqProviderError } from "./groq_provider.ts";
 
 const recommendation: OwnedRecommendation = {
   id: "460d90f1-d4f1-451f-ac69-761dc972b652",
@@ -48,6 +49,7 @@ Deno.test("authenticated owner can create analysis for an accepted recommendatio
   assertEquals(fake.savedRows.length, 1);
   assertEquals(fake.savedRows[0].recommendation_id, recommendation.id);
   assertEquals(fake.savedRows[0].owner_user_id, recommendation.owner_user_id);
+  assertEquals(fake.savedRows[0].model_identifier, "openai/gpt-oss-20b");
   assertEquals(fake.reportedErrors, []);
   assertEquals(fake.recommendationLookupArguments, [[
     recommendation.id,
@@ -57,6 +59,31 @@ Deno.test("authenticated owner can create analysis for an accepted recommendatio
     recommendation.id,
     recommendation.owner_user_id,
   ]]);
+});
+
+Deno.test("provider failures remain generic and report only fixed telemetry", async () => {
+  const fake = new FakeDependencies();
+  fake.generateError = new GroqProviderError("unavailable", {
+    stage: "provider_request",
+    code: "timeout",
+  });
+
+  const response = await createAnalysisHandler(fake.dependencies)(request());
+  const body = await response.json();
+
+  assertEquals(response.status, 503);
+  assertEquals(body, {
+    error: {
+      code: "PROVIDER_UNAVAILABLE",
+      message: "AI analysis is temporarily unavailable.",
+    },
+  });
+  assertEquals(fake.reportedErrors, [{
+    event: "generate_recommendation_analysis_error",
+    stage: "provider_request",
+    code: "timeout",
+  }]);
+  assertEquals(JSON.stringify(body).includes("timeout"), false);
 });
 
 Deno.test("recommendation query errors are server failures, never false 404s", async () => {
@@ -90,7 +117,7 @@ Deno.test("recommendation query errors are server failures, never false 404s", a
   assertEquals(JSON.stringify(body).includes("sensitive"), false);
 });
 
-Deno.test("authentication failure rejects before record lookup or Gemini", async () => {
+Deno.test("authentication failure rejects before record lookup or provider call", async () => {
   const fake = new FakeDependencies();
   fake.authResult = {
     userId: null,
@@ -137,7 +164,7 @@ Deno.test("missing or non-owned recommendation remains safely rejected", async (
   ]]);
 });
 
-Deno.test("existing snapshot is returned without invoking Gemini", async () => {
+Deno.test("existing snapshot is returned without invoking the provider", async () => {
   const fake = new FakeDependencies();
   fake.analysisResult = { data: snapshot, error: null };
 
@@ -152,7 +179,7 @@ Deno.test("existing snapshot is returned without invoking Gemini", async () => {
   assertEquals(fake.reportedErrors, []);
 });
 
-Deno.test("snapshot query errors are server failures and skip Gemini", async () => {
+Deno.test("snapshot query errors are server failures and skip the provider", async () => {
   const fake = new FakeDependencies();
   fake.analysisResult = {
     data: null,
@@ -331,7 +358,7 @@ Deno.test("throwing database code getters remain safe at the save stage", async 
   }]);
 });
 
-Deno.test("unique insert race reloads one snapshot without a second Gemini call", async () => {
+Deno.test("unique insert race reloads one snapshot without a second provider call", async () => {
   const fake = new FakeDependencies();
   fake.saveResult = { data: null, error: { code: "23505" } };
   fake.analysisResults = [
@@ -465,6 +492,7 @@ class FakeDependencies {
   analysisResult: DatabaseResult<SavedAnalysis> = { data: null, error: null };
   analysisResults?: DatabaseResult<SavedAnalysis>[];
   saveResult: DatabaseResult<null> = { data: null, error: null };
+  generateError: unknown | null = null;
   providerCalls = 0;
   recommendationLookups = 0;
   analysisLookups = 0;
@@ -495,6 +523,7 @@ class FakeDependencies {
       },
       async (_) => {
         this.providerCalls++;
+        if (this.generateError) throw this.generateError;
         return {
           summary: snapshot.summary,
           rationale: snapshot.rationale,

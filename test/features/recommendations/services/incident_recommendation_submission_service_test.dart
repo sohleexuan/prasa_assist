@@ -12,7 +12,7 @@ import 'package:prasa_assist/features/recommendations/domain/verified_incident_r
 
 void main() {
   test(
-    'persists the deterministic B1023 peak recommendation without Gemini',
+    'persists the deterministic B1023 peak recommendation without provider analysis',
     () async {
       final repository = _Repository();
       final service = _service(repository);

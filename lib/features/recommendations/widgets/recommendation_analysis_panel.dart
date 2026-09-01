@@ -23,7 +23,7 @@ class RecommendationAnalysisPanel extends StatelessWidget {
     return AppSectionCard(
       title: 'AI-generated explanation',
       subtitle:
-          'Gemini explains stored deterministic facts only. Staff must decide.',
+          'AI explains stored deterministic facts only. Staff must decide.',
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

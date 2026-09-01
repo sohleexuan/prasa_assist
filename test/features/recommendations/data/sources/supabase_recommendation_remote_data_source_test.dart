@@ -159,7 +159,7 @@ Map<String, Object?> _row({bool withAnalysis = false}) => {
   'recommendation_analyses': withAnalysis
       ? [
           {
-            'model_identifier': 'gemini-2.5-flash',
+            'model_identifier': 'openai/gpt-oss-20b',
             'schema_version': 1,
             'summary': 'Inspect B1023.',
             'rationale': ['Confirmed breakdown.'],

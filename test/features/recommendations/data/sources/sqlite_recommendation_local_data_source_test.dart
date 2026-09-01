@@ -76,7 +76,7 @@ RecommendationRecordDto _record(String owner) => RecommendationRecordDto(
   ),
   analysis: RecommendationAnalysis(
     recommendationId: 'rec-1',
-    modelIdentifier: 'gemini-2.5-flash',
+    modelIdentifier: 'openai/gpt-oss-20b',
     schemaVersion: 1,
     summary: 'Review the confirmed breakdown.',
     rationale: ['Stored evidence supports inspection.'],

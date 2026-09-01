@@ -1,4 +1,9 @@
 import { AnalysisContract, DeterministicFacts } from "./analysis_contract.ts";
+import {
+  groqModelIdentifier,
+  GroqProviderError,
+  ProviderTelemetry,
+} from "./groq_provider.ts";
 
 const headers = { "Content-Type": "application/json" };
 
@@ -20,7 +25,8 @@ export type ServerErrorEvent = {
     | "find_owned_recommendation"
     | "find_existing_analysis"
     | "save_analysis"
-    | "reload_after_duplicate";
+    | "reload_after_duplicate"
+    | ProviderTelemetry["stage"];
   code: string;
 };
 
@@ -61,12 +67,6 @@ export type AuthResult = {
   userId: string | null;
   error: unknown | null;
 };
-
-export class ProviderError extends Error {
-  constructor(readonly kind: "unavailable" | "invalid_response") {
-    super(kind);
-  }
-}
 
 export class AnalysisDependencies {
   constructor(
@@ -156,7 +156,12 @@ export function createAnalysisHandler(dependencies: AnalysisDependencies) {
     try {
       analysis = await dependencies.generate(recommendation);
     } catch (error) {
-      if (error instanceof ProviderError && error.kind === "invalid_response") {
+      if (error instanceof GroqProviderError) {
+        reportProviderError(dependencies, error.telemetry);
+      }
+      if (
+        error instanceof GroqProviderError && error.kind === "invalid_response"
+      ) {
         return safe(
           502,
           "INVALID_MODEL_RESPONSE",
@@ -173,7 +178,7 @@ export function createAnalysisHandler(dependencies: AnalysisDependencies) {
     const saved: SavedAnalysis = {
       recommendation_id: recommendation.id,
       owner_user_id: authentication.userId,
-      model_identifier: "gemini-2.5-flash",
+      model_identifier: groqModelIdentifier,
       schema_version: 1,
       summary: analysis.summary,
       rationale: analysis.rationale,
@@ -214,6 +219,22 @@ export function createAnalysisHandler(dependencies: AnalysisDependencies) {
     }
     return analysisResponse(saved, 201, false);
   };
+}
+
+function reportProviderError(
+  dependencies: AnalysisDependencies,
+  telemetry: ProviderTelemetry,
+): void {
+  try {
+    const result = dependencies.reportError({
+      event: "generate_recommendation_analysis_error",
+      stage: telemetry.stage,
+      code: telemetry.code,
+    });
+    if (result !== undefined) void Promise.resolve(result).catch(() => {});
+  } catch {
+    // Observability must never change the client response.
+  }
 }
 
 function reportServerError(
