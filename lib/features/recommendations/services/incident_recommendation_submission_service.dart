@@ -10,7 +10,7 @@ import 'recommendation_generator.dart';
 
 /// Creates deterministic pending-review recommendations from verified facts.
 ///
-/// This service never invokes Gemini. AI analysis remains a separate,
+/// This service never invokes a provider. AI analysis remains a separate,
 /// explanation-only operation after deterministic persistence.
 class IncidentRecommendationSubmissionService {
   IncidentRecommendationSubmissionService({

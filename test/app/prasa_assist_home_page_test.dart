@@ -728,7 +728,7 @@ RecommendationRecordDto _acceptedMaintenanceRecord() {
     ),
     analysis: RecommendationAnalysis(
       recommendationId: 'REC-B1023-300',
-      modelIdentifier: 'test-explanation-model',
+      modelIdentifier: 'openai/gpt-oss-20b',
       schemaVersion: 1,
       summary: 'Inspect B1023 before returning it to service.',
       rationale: const ['Confirmed breakdown evidence.'],

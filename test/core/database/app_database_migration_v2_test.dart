@@ -30,9 +30,9 @@ void main() {
         ],
       );
 
-      expect(version.single['user_version'], 5);
+      expect(version.single['user_version'], 6);
       expect(foreignKeys.single['foreign_keys'], 1);
-      expect(migrations.map((row) => row['version']), [1, 2, 3, 4, 5]);
+      expect(migrations.map((row) => row['version']), [1, 2, 3, 4, 5, 6]);
       expect(tables, hasLength(2));
       final indexes = await database.rawQuery(
         "SELECT name FROM sqlite_master WHERE type = 'index' "
@@ -73,7 +73,7 @@ void main() {
             AppDatabaseSchema.migrationTable,
             orderBy: 'version ASC',
           )).map((row) => row['version']),
-          [1, 2, 3, 4, 5],
+          [1, 2, 3, 4, 5, 6],
         );
         await upgraded.close();
 
@@ -84,7 +84,7 @@ void main() {
             AppDatabaseSchema.migrationTable,
             orderBy: 'version ASC',
           )).map((row) => row['version']),
-          [1, 2, 3, 4, 5],
+          [1, 2, 3, 4, 5, 6],
         );
         expect(
           (await reopened.query('preserved_before_v2')).single['value'],

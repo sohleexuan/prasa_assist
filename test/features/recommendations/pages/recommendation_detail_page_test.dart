@@ -21,6 +21,29 @@ import 'package:prasa_assist/features/work_orders/models/work_order.dart';
 import 'package:prasa_assist/features/work_orders/models/work_order_prefill.dart';
 
 void main() {
+  testWidgets('analysis panel uses provider-neutral staff-decision wording', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: RecommendationAnalysisPanel(
+            analysis: null,
+            loading: false,
+            errorMessage: null,
+            onRetry: null,
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      find.text('AI explains stored deterministic facts only. Staff must decide.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Gemini'), findsNothing);
+  });
+
   test('repeated analysis retry keeps only one request in flight', () async {
     final repository = _DelayedAnalysisRepository(
       _acceptedRecord(withAnalysis: false),

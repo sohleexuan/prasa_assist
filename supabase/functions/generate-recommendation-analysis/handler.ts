@@ -1,12 +1,50 @@
 import { AnalysisContract, DeterministicFacts } from "./analysis_contract.ts";
+import {
+  groqModelIdentifier,
+  GroqProviderError,
+  ProviderTelemetry,
+} from "./groq_provider.ts";
 
 const headers = { "Content-Type": "application/json" };
 
-export type DatabaseError = { code?: string };
+export type DatabaseError = {
+  code?: unknown;
+  message?: unknown;
+  details?: unknown;
+  hint?: unknown;
+};
 export type DatabaseResult<T> = {
   data: T | null;
   error: DatabaseError | null;
 };
+
+export type ServerErrorEvent = {
+  event: "generate_recommendation_analysis_error";
+  stage:
+    | "authenticate"
+    | "find_owned_recommendation"
+    | "find_existing_analysis"
+    | "save_analysis"
+    | "reload_after_duplicate"
+    | ProviderTelemetry["stage"];
+  code: string;
+};
+
+const safeErrorCodes = new Set([
+  "22P02",
+  "23502",
+  "23503",
+  "23505",
+  "23514",
+  "40001",
+  "42501",
+  "42703",
+  "42P01",
+  "57014",
+  "PGRST116",
+  "bad_jwt",
+  "invalid_token",
+]);
 
 export type OwnedRecommendation = DeterministicFacts & {
   owner_user_id: string;
@@ -30,12 +68,6 @@ export type AuthResult = {
   error: unknown | null;
 };
 
-export class ProviderError extends Error {
-  constructor(readonly kind: "unavailable" | "invalid_response") {
-    super(kind);
-  }
-}
-
 export class AnalysisDependencies {
   constructor(
     readonly authenticate: (authorization: string) => Promise<AuthResult>,
@@ -54,6 +86,9 @@ export class AnalysisDependencies {
       analysis: SavedAnalysis,
     ) => Promise<DatabaseResult<null>>,
     readonly clock: () => Date,
+    readonly reportError: (
+      event: ServerErrorEvent,
+    ) => void | PromiseLike<void>,
   ) {}
 }
 
@@ -69,6 +104,7 @@ export function createAnalysisHandler(dependencies: AnalysisDependencies) {
 
     const authentication = await dependencies.authenticate(authorization);
     if (authentication.error || !authentication.userId) {
+      reportServerError(dependencies, "authenticate", authentication.error);
       return safe(401, "AUTH_REQUIRED", "Sign in is required.");
     }
 
@@ -80,6 +116,11 @@ export function createAnalysisHandler(dependencies: AnalysisDependencies) {
       authentication.userId,
     );
     if (recommendationResult.error) {
+      reportServerError(
+        dependencies,
+        "find_owned_recommendation",
+        recommendationResult.error,
+      );
       return safe(
         500,
         "PERSISTENCE_ERROR",
@@ -96,6 +137,11 @@ export function createAnalysisHandler(dependencies: AnalysisDependencies) {
       authentication.userId,
     );
     if (existingResult.error) {
+      reportServerError(
+        dependencies,
+        "find_existing_analysis",
+        existingResult.error,
+      );
       return safe(
         500,
         "PERSISTENCE_ERROR",
@@ -110,7 +156,12 @@ export function createAnalysisHandler(dependencies: AnalysisDependencies) {
     try {
       analysis = await dependencies.generate(recommendation);
     } catch (error) {
-      if (error instanceof ProviderError && error.kind === "invalid_response") {
+      if (error instanceof GroqProviderError) {
+        reportProviderError(dependencies, error.telemetry);
+      }
+      if (
+        error instanceof GroqProviderError && error.kind === "invalid_response"
+      ) {
         return safe(
           502,
           "INVALID_MODEL_RESPONSE",
@@ -127,7 +178,7 @@ export function createAnalysisHandler(dependencies: AnalysisDependencies) {
     const saved: SavedAnalysis = {
       recommendation_id: recommendation.id,
       owner_user_id: authentication.userId,
-      model_identifier: "gemini-2.5-flash",
+      model_identifier: groqModelIdentifier,
       schema_version: 1,
       summary: analysis.summary,
       rationale: analysis.rationale,
@@ -136,12 +187,25 @@ export function createAnalysisHandler(dependencies: AnalysisDependencies) {
       generated_at: dependencies.clock().toISOString(),
     };
     const saveResult = await dependencies.saveAnalysis(saved);
-    if (saveResult.error?.code === "23505") {
+    let saveErrorCode: string | null = null;
+    if (saveResult.error) {
+      saveErrorCode = reportServerError(
+        dependencies,
+        "save_analysis",
+        saveResult.error,
+      );
+    }
+    if (saveErrorCode === "23505") {
       const raced = await dependencies.findAnalysis(
         recommendationId,
         authentication.userId,
       );
       if (raced.error || !raced.data) {
+        reportServerError(
+          dependencies,
+          "reload_after_duplicate",
+          raced.error,
+        );
         return safe(
           500,
           "PERSISTENCE_ERROR",
@@ -155,6 +219,53 @@ export function createAnalysisHandler(dependencies: AnalysisDependencies) {
     }
     return analysisResponse(saved, 201, false);
   };
+}
+
+function reportProviderError(
+  dependencies: AnalysisDependencies,
+  telemetry: ProviderTelemetry,
+): void {
+  try {
+    const result = dependencies.reportError({
+      event: "generate_recommendation_analysis_error",
+      stage: telemetry.stage,
+      code: telemetry.code,
+    });
+    if (result !== undefined) void Promise.resolve(result).catch(() => {});
+  } catch {
+    // Observability must never change the client response.
+  }
+}
+
+function reportServerError(
+  dependencies: AnalysisDependencies,
+  stage: ServerErrorEvent["stage"],
+  error: unknown,
+): string {
+  const code = safeErrorCode(error);
+  try {
+    const result = dependencies.reportError({
+      event: "generate_recommendation_analysis_error",
+      stage,
+      code,
+    });
+    if (result !== undefined) void Promise.resolve(result).catch(() => {});
+  } catch {
+    // Observability must never change the client response.
+  }
+  return code;
+}
+
+function safeErrorCode(error: unknown): string {
+  try {
+    if (!error || typeof error !== "object") return "unknown";
+    const code = (error as { code?: unknown }).code;
+    return typeof code === "string" && safeErrorCodes.has(code)
+      ? code
+      : "unknown";
+  } catch {
+    return "unknown";
+  }
 }
 
 async function parseRecommendationId(

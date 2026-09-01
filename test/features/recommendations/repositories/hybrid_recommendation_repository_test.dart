@@ -26,9 +26,9 @@ void main() {
     );
     remote.failAnalysis = false;
     final saved = await repository.generateAnalysis('rec-1');
-    expect(saved.analysis?.modelIdentifier, 'gemini-2.5-flash');
+    expect(saved.analysis?.modelIdentifier, 'openai/gpt-oss-20b');
     final existing = await repository.generateAnalysis('rec-1');
-    expect(existing.analysis?.modelIdentifier, 'gemini-2.5-flash');
+    expect(existing.analysis?.modelIdentifier, 'openai/gpt-oss-20b');
     expect(remote.analysisCalls, 2);
   });
 
@@ -194,7 +194,7 @@ RecommendationRecordDto _record({bool withAnalysis = false}) {
     analysis: withAnalysis
         ? RecommendationAnalysis(
             recommendationId: 'rec-1',
-            modelIdentifier: 'gemini-2.5-flash',
+            modelIdentifier: 'openai/gpt-oss-20b',
             schemaVersion: 1,
             summary: 'Review.',
             rationale: ['Confirmed breakdown.'],

@@ -1,4 +1,9 @@
 class RecommendationAnalysis {
+  static const supportedModelIdentifiers = {
+    'gemini-2.5-flash',
+    'openai/gpt-oss-20b',
+  };
+
   RecommendationAnalysis({
     required String recommendationId,
     required String modelIdentifier,
@@ -9,7 +14,7 @@ class RecommendationAnalysis {
     required List<String> staffReviewChecklist,
     required DateTime generatedAt,
   }) : recommendationId = _required(recommendationId, 'recommendationId'),
-       modelIdentifier = _required(modelIdentifier, 'modelIdentifier'),
+       modelIdentifier = _modelIdentifier(modelIdentifier),
        summary = _required(summary, 'summary'),
        rationale = _list(rationale, 'rationale'),
        limitations = _list(limitations, 'limitations'),
@@ -25,7 +30,7 @@ class RecommendationAnalysis {
     Map<String, Object?> json, {
     required String recommendationId,
     required DateTime generatedAt,
-    String modelIdentifier = 'gemini-2.5-flash',
+    required String modelIdentifier,
     int schemaVersion = 1,
   }) {
     const keys = {
@@ -80,6 +85,14 @@ class RecommendationAnalysis {
       throw FormatException('$name is blank or too long.');
     }
     return trimmed;
+  }
+
+  static String _modelIdentifier(String value) {
+    final normalized = _required(value, 'modelIdentifier');
+    if (!supportedModelIdentifiers.contains(normalized)) {
+      throw const FormatException('Unsupported modelIdentifier.');
+    }
+    return normalized;
   }
 
   static List<String> _list(List<String> value, String name) {
