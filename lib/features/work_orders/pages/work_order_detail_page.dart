@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/time/malaysia_time.dart';
 import '../../../shared/widgets/app_error_state.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
 import '../../../shared/widgets/app_section_card.dart';
@@ -413,9 +414,7 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
 
   String _format(DateTime? value) {
     if (value == null) return 'Not scheduled';
-    String two(int number) => number.toString().padLeft(2, '0');
-    return '${value.year}-${two(value.month)}-${two(value.day)} '
-        '${two(value.hour)}:${two(value.minute)}';
+    return MalaysiaTime.formatDateTime(value);
   }
 
   String _formatLifecycle(DateTime? value) =>

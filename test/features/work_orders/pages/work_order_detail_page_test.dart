@@ -12,7 +12,7 @@ import 'package:prasa_assist/features/work_orders/pages/work_order_detail_page.d
 import 'package:prasa_assist/features/work_orders/repositories/work_order_hybrid_operations.dart';
 
 void main() {
-  final now = DateTime(2026, 8, 27, 9);
+  final now = DateTime.utc(2026, 8, 27, 1);
 
   WorkOrder record({WorkOrderStatus status = WorkOrderStatus.draft}) =>
       WorkOrder(
@@ -27,8 +27,8 @@ void main() {
                 status == WorkOrderStatus.completed
             ? 'Staff B'
             : null,
-        scheduledStart: DateTime(2026, 8, 28, 9),
-        scheduledEnd: DateTime(2026, 8, 28, 11),
+        scheduledStart: DateTime.utc(2026, 8, 28, 1),
+        scheduledEnd: DateTime.utc(2026, 8, 28, 3),
         status: status,
         createdByUserId: '11111111-1111-4111-8111-111111111111',
         createdBy: 'Demo operations staff',
@@ -59,6 +59,9 @@ void main() {
     expect(find.text('B1023'), findsOneWidget);
     expect(find.textContaining('Route 300'), findsOneWidget);
     expect(find.text('Not assigned'), findsOneWidget);
+    expect(find.text('2026-08-28 09:00 MYT'), findsOneWidget);
+    expect(find.text('2026-08-28 11:00 MYT'), findsOneWidget);
+    expect(find.text('2026-08-27 09:00 MYT'), findsNWidgets(2));
     await tester.drag(find.byType(ListView), const Offset(0, -700));
     await tester.pumpAndSettle();
     expect(

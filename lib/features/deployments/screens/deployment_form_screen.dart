@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/time/malaysia_time.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
 import '../../../shared/widgets/app_section_card.dart';
 import '../controllers/deployment_controller.dart';
@@ -90,7 +91,7 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
   @override
   void initState() {
     super.initState();
-    final now = _now.toLocal();
+    final now = _now.toUtc();
     final existing = widget.existingDeployment;
     final localWork = widget.existingLocalWorkItem;
     final localDraft = localWork?.draft;
@@ -144,11 +145,11 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
         (existing?.startTime ??
                 localDraft?.startTime ??
                 prefill?.suggestedStartTime)
-            ?.toLocal() ??
+            ?.toUtc() ??
         _toMinute(now);
     _endTime =
         (existing?.endTime ?? localDraft?.endTime ?? prefill?.suggestedEndTime)
-            ?.toLocal() ??
+            ?.toUtc() ??
         _startTime.add(const Duration(hours: 1));
   }
 
@@ -539,7 +540,7 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
       }
       return;
     }
-    final timestamp = _now;
+    final timestamp = _now.toUtc();
     final deployment = ServiceDeployment(
       deploymentId: _deploymentIdController.text.trim(),
       routeId: _routeIdController.text.trim(),
@@ -664,9 +665,10 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
 
   Future<void> _pickDate({required bool isStart}) async {
     final currentValue = isStart ? _startTime : _endTime;
+    final currentWallClock = MalaysiaTime.instantToWallClock(currentValue);
     final date = await showDatePicker(
       context: context,
-      initialDate: currentValue,
+      initialDate: currentWallClock,
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
     );
@@ -674,12 +676,14 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
       return;
     }
     setState(() {
-      final updated = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        currentValue.hour,
-        currentValue.minute,
+      final updated = MalaysiaTime.wallClockToUtc(
+        DateTime(
+          date.year,
+          date.month,
+          date.day,
+          currentWallClock.hour,
+          currentWallClock.minute,
+        ),
       );
       if (isStart) {
         _startTime = updated;
@@ -692,9 +696,10 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
 
   Future<void> _pickTime({required bool isStart}) async {
     final currentValue = isStart ? _startTime : _endTime;
+    final currentWallClock = MalaysiaTime.instantToWallClock(currentValue);
     final time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(currentValue),
+      initialTime: TimeOfDay.fromDateTime(currentWallClock),
       builder: (context, child) {
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
@@ -706,12 +711,14 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
       return;
     }
     setState(() {
-      final updated = DateTime(
-        currentValue.year,
-        currentValue.month,
-        currentValue.day,
-        time.hour,
-        time.minute,
+      final updated = MalaysiaTime.wallClockToUtc(
+        DateTime(
+          currentWallClock.year,
+          currentWallClock.month,
+          currentWallClock.day,
+          time.hour,
+          time.minute,
+        ),
       );
       if (isStart) {
         _startTime = updated;
@@ -731,13 +738,8 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
   }
 
   DateTime _toMinute(DateTime value) {
-    return DateTime(
-      value.year,
-      value.month,
-      value.day,
-      value.hour,
-      value.minute,
-    );
+    final utc = value.toUtc();
+    return DateTime.utc(utc.year, utc.month, utc.day, utc.hour, utc.minute);
   }
 }
 

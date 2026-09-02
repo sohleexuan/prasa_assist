@@ -1,18 +1,13 @@
+import '../../../core/time/malaysia_time.dart';
+
 String formatDeploymentLocalDateTime(DateTime value) {
-  final local = value.toLocal();
-  return '${formatDeploymentLocalDate(local)} '
-      '${formatDeploymentLocalTime(local)}';
+  return MalaysiaTime.formatDateTime(value);
 }
 
 String formatDeploymentLocalDate(DateTime value) {
-  final local = value.toLocal();
-  return '${local.year.toString().padLeft(4, '0')}-'
-      '${local.month.toString().padLeft(2, '0')}-'
-      '${local.day.toString().padLeft(2, '0')}';
+  return MalaysiaTime.formatDate(value);
 }
 
 String formatDeploymentLocalTime(DateTime value) {
-  final local = value.toLocal();
-  return '${local.hour.toString().padLeft(2, '0')}:'
-      '${local.minute.toString().padLeft(2, '0')}';
+  return MalaysiaTime.formatTime(value);
 }

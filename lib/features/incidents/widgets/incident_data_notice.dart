@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/time/malaysia_time.dart';
 import '../../../shared/widgets/app_section_card.dart';
 import '../../../shared/widgets/app_status_chip.dart';
 import '../models/incident_read_result.dart';
@@ -21,7 +22,7 @@ class IncidentDataNotice extends StatelessWidget {
       title: isPersistent ? 'Shared Incident Data' : 'Module 1 Prototype',
       subtitle: provenance?.isCached == true
           ? 'Showing owner-scoped SQLite cache saved at '
-                '${provenance!.retrievedAtUtc.toLocal()}. Supabase is '
+                '${MalaysiaTime.formatDateTime(provenance!.retrievedAtUtc)}. Supabase is '
                 'currently unreachable.'
           : isPersistent
           ? 'Supabase-backed staff records persist across app restarts. '

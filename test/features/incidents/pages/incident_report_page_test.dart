@@ -24,6 +24,8 @@ void main() {
     expect(find.textContaining('Staff must review'), findsOneWidget);
     expect(find.text('31 minutes'), findsOneWidget);
     expect(find.text('Major'), findsOneWidget);
+    expect(find.text('2026-08-28 MYT'), findsOneWidget);
+    expect(find.text('08:00 MYT'), findsOneWidget);
     expect(
       tester
           .widget<EditableText>(
@@ -124,6 +126,8 @@ void main() {
     expect(saved!.vehicleId, 'B1023');
     expect(saved!.estimatedDelayMinutes, 75);
     expect(saved!.reportedBy, 'staff-001');
+    expect(saved!.reportedAt, DateTime.utc(2026, 8, 28));
+    expect(saved!.reportedAt.isUtc, isTrue);
     expect(saved!.statusHistory, hasLength(1));
     expect(await repository.getById('INC-TEST-001'), saved);
   });
@@ -319,4 +323,4 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
   await tester.pump();
 }
 
-DateTime _clock() => DateTime(2026, 8, 28, 8);
+DateTime _clock() => DateTime.utc(2026, 8, 28);

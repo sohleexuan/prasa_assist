@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/time/malaysia_time.dart';
 import '../../../shared/widgets/app_empty_state.dart';
 import '../../../shared/widgets/app_error_state.dart';
 import '../../../shared/widgets/app_loading_indicator.dart';
@@ -816,7 +817,5 @@ AppStatusTone _impactTone(OperationalImpactLevel impact) => switch (impact) {
 };
 
 String _formatDateTime(DateTime value) {
-  String twoDigits(int number) => number.toString().padLeft(2, '0');
-  return '${value.year}-${twoDigits(value.month)}-${twoDigits(value.day)} '
-      '${twoDigits(value.hour)}:${twoDigits(value.minute)}';
+  return MalaysiaTime.formatDateTime(value);
 }

@@ -29,9 +29,9 @@ void main() {
     ) async {
       await _pumpForm(tester);
 
-      expect(find.text('2026-08-27'), findsNWidgets(2));
-      expect(find.text('08:30'), findsOneWidget);
-      expect(find.text('09:30'), findsOneWidget);
+      expect(find.text('2026-08-27 MYT'), findsNWidgets(2));
+      expect(find.text('08:30 MYT'), findsOneWidget);
+      expect(find.text('09:30 MYT'), findsOneWidget);
     });
 
     testWidgets('opens Flutter built-in date and time pickers', (tester) async {
@@ -167,6 +167,10 @@ void main() {
       expect(stored!.status, DeploymentStatus.draft);
       expect(stored.createdBy, 'staff-001');
       expect(stored.createdAt, _testNow);
+      expect(stored.startTime, DateTime.utc(2026, 8, 27, 0, 30));
+      expect(stored.endTime, DateTime.utc(2026, 8, 27, 1, 30));
+      expect(stored.startTime.isUtc, isTrue);
+      expect(stored.endTime.isUtc, isTrue);
       expect(savedDeployment, stored);
     });
 
@@ -299,8 +303,8 @@ void main() {
           incidentId: 'INC-2026-0142',
           recommendationId: 'REC-0088',
           suggestedVehicleCount: 2,
-          suggestedStartTime: DateTime(2026, 8, 27, 9),
-          suggestedEndTime: DateTime(2026, 8, 27, 11),
+          suggestedStartTime: DateTime.utc(2026, 8, 27, 1),
+          suggestedEndTime: DateTime.utc(2026, 8, 27, 3),
           suggestedPurpose: 'Deploy replacement buses after staff review',
         ),
       );
@@ -313,8 +317,8 @@ void main() {
         _fieldText(tester, 'purpose-field'),
         'Deploy replacement buses after staff review',
       );
-      expect(find.text('09:00'), findsOneWidget);
-      expect(find.text('11:00'), findsOneWidget);
+      expect(find.text('09:00 MYT'), findsOneWidget);
+      expect(find.text('11:00 MYT'), findsOneWidget);
       expect(
         find.text(
           'Recommendation suggests 2 vehicles. '
@@ -507,14 +511,14 @@ void main() {
       final existing = _existingDeployment(startTime: start, endTime: end);
       final harness = await _pumpForm(tester, existingDeployment: existing);
 
-      if (_localDate(start) == _localDate(end)) {
-        expect(find.text(_localDate(start)), findsNWidgets(2));
+      if (_malaysiaDate(start) == _malaysiaDate(end)) {
+        expect(find.text(_malaysiaDate(start)), findsNWidgets(2));
       } else {
-        expect(find.text(_localDate(start)), findsOneWidget);
-        expect(find.text(_localDate(end)), findsOneWidget);
+        expect(find.text(_malaysiaDate(start)), findsOneWidget);
+        expect(find.text(_malaysiaDate(end)), findsOneWidget);
       }
-      expect(find.text(_localTime(start)), findsOneWidget);
-      expect(find.text(_localTime(end)), findsOneWidget);
+      expect(find.text(_malaysiaTime(start)), findsOneWidget);
+      expect(find.text(_malaysiaTime(end)), findsOneWidget);
 
       await _submit(tester, 'save-changes-button');
 
@@ -671,8 +675,8 @@ void main() {
   });
 }
 
-final DateTime _testNow = DateTime(2026, 8, 27, 8, 30);
-final DateTime _controllerNow = DateTime(2026, 8, 27, 8, 31);
+final DateTime _testNow = DateTime.utc(2026, 8, 27, 0, 30);
+final DateTime _controllerNow = DateTime.utc(2026, 8, 27, 0, 31);
 
 class _FormHarness {
   const _FormHarness({required this.repository, required this.controller});
@@ -913,15 +917,15 @@ ServiceDeployment _existingDeployment({
   );
 }
 
-String _localDate(DateTime value) {
-  final local = value.toLocal();
-  return '${local.year.toString().padLeft(4, '0')}-'
-      '${local.month.toString().padLeft(2, '0')}-'
-      '${local.day.toString().padLeft(2, '0')}';
+String _malaysiaDate(DateTime value) {
+  final malaysia = value.toUtc().add(const Duration(hours: 8));
+  return '${malaysia.year.toString().padLeft(4, '0')}-'
+      '${malaysia.month.toString().padLeft(2, '0')}-'
+      '${malaysia.day.toString().padLeft(2, '0')} MYT';
 }
 
-String _localTime(DateTime value) {
-  final local = value.toLocal();
-  return '${local.hour.toString().padLeft(2, '0')}:'
-      '${local.minute.toString().padLeft(2, '0')}';
+String _malaysiaTime(DateTime value) {
+  final malaysia = value.toUtc().add(const Duration(hours: 8));
+  return '${malaysia.hour.toString().padLeft(2, '0')}:'
+      '${malaysia.minute.toString().padLeft(2, '0')} MYT';
 }

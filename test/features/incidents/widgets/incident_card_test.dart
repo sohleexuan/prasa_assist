@@ -14,6 +14,7 @@ void main() {
     expect(find.textContaining('INC-20260828-001'), findsOneWidget);
     expect(find.text('Route 300'), findsOneWidget);
     expect(find.text('B1023'), findsOneWidget);
+    expect(find.text('2026-08-28 07:55 MYT'), findsOneWidget);
     expect(find.text('Reported'), findsOneWidget);
     expect(find.text('High'), findsOneWidget);
     expect(find.text('Severe'), findsOneWidget);

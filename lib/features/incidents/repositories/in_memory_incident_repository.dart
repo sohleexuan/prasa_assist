@@ -1,4 +1,5 @@
 import '../data/incident_demo_data.dart';
+import '../../../core/time/malaysia_time.dart';
 import '../models/delay_estimate.dart';
 import '../models/incident.dart';
 import '../models/incident_enums.dart';
@@ -238,7 +239,7 @@ class InMemoryIncidentRepository
       severity: incident.severity,
       vehicleCondition: incident.vehicleCondition,
       disruptionScope: incident.disruptionScope,
-      reportedAt: incident.reportedAt,
+      reportedAt: MalaysiaTime.instantToWallClock(incident.reportedAt),
     );
   }
 

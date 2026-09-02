@@ -4,6 +4,7 @@ import '../../../core/routes/bundled_route_catalog_repository.dart';
 import '../../../core/routes/route_catalog.dart';
 import '../../../core/routes/route_catalog_repository.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/time/malaysia_time.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
 import '../../../shared/widgets/app_section_card.dart';
 import '../../../shared/widgets/app_status_chip.dart';
@@ -84,7 +85,7 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
     severity: _severity,
     vehicleCondition: _vehicleCondition,
     disruptionScope: _disruptionScope,
-    reportedAt: _reportedAt,
+    reportedAt: MalaysiaTime.instantToWallClock(_reportedAt),
   );
 
   @override
@@ -92,7 +93,7 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
     super.initState();
     final now = _now;
     final existing = widget.existingIncident;
-    _reportedAt = existing?.reportedAt ?? _toMinute(now);
+    _reportedAt = existing?.reportedAt.toUtc() ?? _toMinute(now.toUtc());
     _incidentType = existing?.incidentType ?? IncidentType.vehicleBreakdown;
     _severity = existing?.severity ?? IncidentSeverity.medium;
     _vehicleCondition = existing?.vehicleCondition ?? VehicleCondition.unknown;
@@ -553,7 +554,7 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
       return;
     }
     FocusScope.of(context).unfocus();
-    final now = _now;
+    final now = _now.toUtc();
     setState(() {
       _showValidation = true;
       _submissionError = null;
@@ -728,43 +729,53 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
   }
 
   Future<void> _pickDate() async {
-    final now = _now;
+    final nowWallClock = MalaysiaTime.instantToWallClock(_now);
+    final reportedWallClock = MalaysiaTime.instantToWallClock(_reportedAt);
     final date = await showDatePicker(
       context: context,
-      initialDate: _reportedAt,
-      firstDate: DateTime(now.year - 1),
-      lastDate: DateTime(now.year, now.month, now.day),
+      initialDate: reportedWallClock,
+      firstDate: DateTime(nowWallClock.year - 1),
+      lastDate: DateTime(
+        nowWallClock.year,
+        nowWallClock.month,
+        nowWallClock.day,
+      ),
     );
     if (date == null || !mounted) {
       return;
     }
     setState(() {
-      _reportedAt = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        _reportedAt.hour,
-        _reportedAt.minute,
+      _reportedAt = MalaysiaTime.wallClockToUtc(
+        DateTime(
+          date.year,
+          date.month,
+          date.day,
+          reportedWallClock.hour,
+          reportedWallClock.minute,
+        ),
       );
       _reportedAtError = null;
     });
   }
 
   Future<void> _pickTime() async {
+    final reportedWallClock = MalaysiaTime.instantToWallClock(_reportedAt);
     final time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(_reportedAt),
+      initialTime: TimeOfDay.fromDateTime(reportedWallClock),
     );
     if (time == null || !mounted) {
       return;
     }
     setState(() {
-      _reportedAt = DateTime(
-        _reportedAt.year,
-        _reportedAt.month,
-        _reportedAt.day,
-        time.hour,
-        time.minute,
+      _reportedAt = MalaysiaTime.wallClockToUtc(
+        DateTime(
+          reportedWallClock.year,
+          reportedWallClock.month,
+          reportedWallClock.day,
+          time.hour,
+          time.minute,
+        ),
       );
       _reportedAtError = null;
     });
@@ -802,13 +813,8 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
   }
 
   static DateTime _toMinute(DateTime value) {
-    return DateTime(
-      value.year,
-      value.month,
-      value.day,
-      value.hour,
-      value.minute,
-    );
+    final utc = value.toUtc();
+    return DateTime.utc(utc.year, utc.month, utc.day, utc.hour, utc.minute);
   }
 }
 
@@ -902,13 +908,13 @@ class _ReportedAtControl extends StatelessWidget {
             key: const ValueKey('incident-reported-date-button'),
             onPressed: enabled ? onPickDate : null,
             icon: const Icon(Icons.calendar_today_outlined),
-            label: Text(_formatDate(value)),
+            label: Text(MalaysiaTime.formatDate(value)),
           ),
           second: OutlinedButton.icon(
             key: const ValueKey('incident-reported-time-button'),
             onPressed: enabled ? onPickTime : null,
             icon: const Icon(Icons.schedule_outlined),
-            label: Text(_formatTime(context, value)),
+            label: Text(MalaysiaTime.formatTime(value)),
           ),
         ),
         if (errorText != null) ...[
@@ -921,16 +927,6 @@ class _ReportedAtControl extends StatelessWidget {
         ],
       ],
     );
-  }
-
-  static String _formatDate(DateTime value) {
-    String twoDigits(int number) => number.toString().padLeft(2, '0');
-    return '${value.year}-${twoDigits(value.month)}-${twoDigits(value.day)}';
-  }
-
-  static String _formatTime(BuildContext context, DateTime value) {
-    return MaterialLocalizations.of(context)
-        .formatTimeOfDay(TimeOfDay.fromDateTime(value));
   }
 }
 

@@ -1,4 +1,5 @@
 import '../../../core/routes/route_catalog.dart';
+import '../../../core/time/malaysia_time.dart';
 import '../models/incident.dart';
 import '../models/incident_enums.dart';
 import '../models/incident_status_change.dart';
@@ -29,6 +30,8 @@ class IncidentReportFactory {
     required DateTime createdAt,
   }) {
     final normalizedReporter = reportedBy.trim();
+    final reportedAtUtc = reportedAt.toUtc();
+    final createdAtUtc = createdAt.toUtc();
     return Incident(
       incidentId: incidentId.trim(),
       incidentType: incidentType,
@@ -38,7 +41,7 @@ class IncidentReportFactory {
       routeName: _optionalText(routeName),
       vehicleId: _optionalText(vehicleId),
       location: location.trim(),
-      reportedAt: reportedAt,
+      reportedAt: reportedAtUtc,
       severity: severity,
       status: IncidentStatus.reported,
       vehicleCondition: vehicleCondition,
@@ -48,17 +51,17 @@ class IncidentReportFactory {
         severity: severity,
         vehicleCondition: vehicleCondition,
         disruptionScope: disruptionScope,
-        reportedAt: reportedAt,
+        reportedAt: MalaysiaTime.instantToWallClock(reportedAtUtc),
       ),
       reportedBy: normalizedReporter,
       dataSource: IncidentDataSource.staffEntered,
-      createdAt: createdAt,
-      updatedAt: createdAt,
+      createdAt: createdAtUtc,
+      updatedAt: createdAtUtc,
       statusHistory: [
         IncidentStatusChange(
           fromStatus: null,
           toStatus: IncidentStatus.reported,
-          changedAt: createdAt,
+          changedAt: createdAtUtc,
           changedBy: normalizedReporter,
           note: 'Incident reported by staff.',
         ),

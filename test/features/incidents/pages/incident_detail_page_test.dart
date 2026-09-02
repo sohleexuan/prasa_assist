@@ -23,6 +23,7 @@ void main() {
     expect(find.text('INC-20260828-001'), findsOneWidget);
     expect(find.text('Route 300'), findsOneWidget);
     expect(find.text('B1023'), findsOneWidget);
+    expect(find.text('2026-08-28 07:55 MYT'), findsOneWidget);
     expect(find.text('75 min'), findsOneWidget);
     expect(find.text('Mock / Demonstration Data'), findsWidgets);
     expect(

@@ -29,6 +29,8 @@ void main() {
     expect(_fieldText(tester, 'incident-route-id-field'), '300');
     expect(_fieldText(tester, 'incident-route-name-field'), 'Route 300');
     expect(_fieldText(tester, 'incident-vehicle-id-field'), 'B1023');
+    expect(find.text('2026-08-28 MYT'), findsOneWidget);
+    expect(find.text('07:55 MYT'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('submit-incident-edit-button')),
       findsOneWidget,

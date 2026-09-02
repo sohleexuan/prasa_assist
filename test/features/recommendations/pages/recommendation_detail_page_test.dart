@@ -38,7 +38,9 @@ void main() {
     );
 
     expect(
-      find.text('AI explains stored deterministic facts only. Staff must decide.'),
+      find.text(
+        'AI explains stored deterministic facts only. Staff must decide.',
+      ),
       findsOneWidget,
     );
     expect(find.textContaining('Gemini'), findsNothing);
@@ -59,6 +61,32 @@ void main() {
     repository.analysisCompleter.complete(_acceptedRecord());
     await Future.wait([first, repeated]);
     expect(controller.find('rec-1')?.analysis, isNotNull);
+  });
+
+  testWidgets('shows recommendation record times in Malaysia time', (
+    tester,
+  ) async {
+    final controller = RecommendationController(
+      _FixedRepository(_acceptedRecord()),
+    );
+    addTearDown(controller.dispose);
+    await controller.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: RecommendationDetailPage(
+          recommendationId: 'rec-1',
+          controller: controller,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Created: 2026-08-29 08:00 MYT'), findsOneWidget);
+    await tester.drag(find.byType(ListView), const Offset(0, -900));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('at 2026-08-29 09:00 MYT'), findsOneWidget);
   });
 
   testWidgets(

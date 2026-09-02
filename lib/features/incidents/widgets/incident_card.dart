@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/time/malaysia_time.dart';
 import '../../../shared/widgets/app_status_chip.dart';
 import '../models/incident.dart';
 import '../models/incident_enums.dart';
@@ -162,9 +163,7 @@ class IncidentCard extends StatelessWidget {
       };
 
   static String _formatDateTime(DateTime value) {
-    String twoDigits(int number) => number.toString().padLeft(2, '0');
-    return '${value.year}-${twoDigits(value.month)}-${twoDigits(value.day)} '
-        '${twoDigits(value.hour)}:${twoDigits(value.minute)}';
+    return MalaysiaTime.formatDateTime(value);
   }
 }
 

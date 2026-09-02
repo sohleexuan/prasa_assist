@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/time/malaysia_time.dart';
 import '../../../shared/widgets/app_error_state.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
 import '../controllers/work_orders_controller.dart';
@@ -241,26 +242,23 @@ class _WorkOrderFormPageState extends State<WorkOrderFormPage> {
 
   Future<void> _selectDateTime({required bool isStart}) async {
     final current = isStart ? _scheduledStart : _scheduledEnd;
+    final currentWallClock = MalaysiaTime.instantToWallClock(
+      current ?? DateTime.now(),
+    );
     final date = await showDatePicker(
       context: context,
-      initialDate: current ?? DateTime.now(),
+      initialDate: currentWallClock,
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
     );
     if (date == null || !mounted) return;
     final time = await showTimePicker(
       context: context,
-      initialTime: current == null
-          ? TimeOfDay.now()
-          : TimeOfDay.fromDateTime(current),
+      initialTime: TimeOfDay.fromDateTime(currentWallClock),
     );
     if (time == null || !mounted) return;
-    final selected = DateTime(
-      date.year,
-      date.month,
-      date.day,
-      time.hour,
-      time.minute,
+    final selected = MalaysiaTime.wallClockToUtc(
+      DateTime(date.year, date.month, date.day, time.hour, time.minute),
     );
     setState(() {
       if (isStart) {
@@ -357,8 +355,6 @@ class _DateTimeField extends StatelessWidget {
   }
 
   String _format(DateTime value) {
-    String two(int number) => number.toString().padLeft(2, '0');
-    return '${value.year}-${two(value.month)}-${two(value.day)} '
-        '${two(value.hour)}:${two(value.minute)}';
+    return MalaysiaTime.formatDateTime(value);
   }
 }

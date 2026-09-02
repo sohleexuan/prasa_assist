@@ -211,6 +211,49 @@ void main() {
     expect(find.text('Editing unavailable'), findsOneWidget);
     expect(find.byKey(const Key('saveWorkOrderButton')), findsNothing);
   });
+
+  testWidgets('edits UTC schedule values as Malaysia wall-clock time', (
+    tester,
+  ) async {
+    final start = DateTime.utc(2026, 9, 1, 20, 30);
+    final end = DateTime.utc(2026, 9, 1, 21, 30);
+    final workOrder = WorkOrder(
+      workOrderId: 'WO-1',
+      vehicleId: 'B1023',
+      taskType: 'Inspection',
+      description: 'Inspect the vehicle.',
+      priority: WorkOrderPriority.high,
+      scheduledStart: start,
+      scheduledEnd: end,
+      status: WorkOrderStatus.draft,
+      createdBy: 'Staff A',
+      createdAt: DateTime.utc(2026, 9, 1),
+      updatedAt: DateTime.utc(2026, 9, 1),
+    );
+    final controller = WorkOrdersController(
+      InMemoryWorkOrderRepository(initialWorkOrders: [workOrder]),
+    );
+    addTearDown(controller.dispose);
+    await controller.load();
+
+    await tester.pumpWidget(
+      _TestHost(
+        child: WorkOrderFormPage(controller: controller, workOrder: workOrder),
+      ),
+    );
+
+    expect(find.text('Scheduled start: 2026-09-02 04:30 MYT'), findsOneWidget);
+    expect(find.text('Scheduled end: 2026-09-02 05:30 MYT'), findsOneWidget);
+    await _scrollToBottom(tester);
+    await tester.tap(find.byKey(const Key('saveWorkOrderButton')));
+    await tester.pumpAndSettle();
+
+    final saved = controller.findById('WO-1')!;
+    expect(saved.scheduledStart, start);
+    expect(saved.scheduledEnd, end);
+    expect(saved.scheduledStart!.isUtc, isTrue);
+    expect(saved.scheduledEnd!.isUtc, isTrue);
+  });
 }
 
 Future<void> _scrollToBottom(WidgetTester tester) async {

@@ -86,15 +86,15 @@ void main() {
     expect(find.text('2 vehicles'), findsOneWidget);
     expect(find.text('BUS-1001'), findsOneWidget);
     expect(find.text('BUS-1002'), findsOneWidget);
-    expect(find.text('2026-08-27 08:05'), findsOneWidget);
-    expect(find.text('2026-08-27 10:35'), findsOneWidget);
+    expect(find.text('2026-08-27 08:05 MYT'), findsOneWidget);
+    expect(find.text('2026-08-27 10:35 MYT'), findsOneWidget);
     expect(find.text('Peak-hour replacement service'), findsOneWidget);
     expect(find.text('Operations Tester'), findsOneWidget);
-    expect(find.text('2026-08-26 14:15'), findsOneWidget);
-    expect(find.text('2026-08-27 07:45'), findsOneWidget);
+    expect(find.text('2026-08-26 14:15 MYT'), findsOneWidget);
+    expect(find.text('2026-08-27 07:45 MYT'), findsOneWidget);
   });
 
-  testWidgets('uses device-local time for service and audit timestamps', (
+  testWidgets('uses fixed Malaysia time for service and audit timestamps', (
     tester,
   ) async {
     final start = DateTime.utc(2026, 8, 27, 20, 40);
@@ -113,10 +113,10 @@ void main() {
       ],
     );
 
-    expect(find.text(_localText(start)), findsOneWidget);
-    expect(find.text(_localText(end)), findsOneWidget);
-    expect(find.text(_localText(created)), findsOneWidget);
-    expect(find.text(_localText(updated)), findsOneWidget);
+    expect(find.text(_malaysiaText(start)), findsOneWidget);
+    expect(find.text(_malaysiaText(end)), findsOneWidget);
+    expect(find.text(_malaysiaText(created)), findsOneWidget);
+    expect(find.text(_malaysiaText(updated)), findsOneWidget);
   });
 
   testWidgets('shows optional Incident and Recommendation links when present', (
@@ -693,13 +693,13 @@ ServiceDeployment _deployment({
     routeId: routeId,
     routeName: routeName,
     vehicleIds: vehicleIds,
-    startTime: startTime ?? DateTime(2026, 8, 27, 8, 5),
-    endTime: endTime ?? DateTime(2026, 8, 27, 10, 35),
+    startTime: startTime ?? DateTime.utc(2026, 8, 27, 0, 5),
+    endTime: endTime ?? DateTime.utc(2026, 8, 27, 2, 35),
     status: status,
     purpose: purpose,
     createdBy: createdBy,
-    createdAt: createdAt ?? DateTime(2026, 8, 26, 14, 15),
-    updatedAt: updatedAt ?? DateTime(2026, 8, 27, 7, 45),
+    createdAt: createdAt ?? DateTime.utc(2026, 8, 26, 6, 15),
+    updatedAt: updatedAt ?? DateTime.utc(2026, 8, 26, 23, 45),
     incidentId: identical(incidentId, _notProvided)
         ? 'INC-2026-0142'
         : incidentId as String?,
@@ -709,13 +709,13 @@ ServiceDeployment _deployment({
   );
 }
 
-String _localText(DateTime value) {
-  final local = value.toLocal();
-  return '${local.year.toString().padLeft(4, '0')}-'
-      '${local.month.toString().padLeft(2, '0')}-'
-      '${local.day.toString().padLeft(2, '0')} '
-      '${local.hour.toString().padLeft(2, '0')}:'
-      '${local.minute.toString().padLeft(2, '0')}';
+String _malaysiaText(DateTime value) {
+  final malaysia = value.toUtc().add(const Duration(hours: 8));
+  return '${malaysia.year.toString().padLeft(4, '0')}-'
+      '${malaysia.month.toString().padLeft(2, '0')}-'
+      '${malaysia.day.toString().padLeft(2, '0')} '
+      '${malaysia.hour.toString().padLeft(2, '0')}:'
+      '${malaysia.minute.toString().padLeft(2, '0')} MYT';
 }
 
 Future<DeploymentController> _pumpDetail(

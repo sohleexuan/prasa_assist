@@ -1,3 +1,4 @@
+import '../../../core/time/malaysia_time.dart';
 import '../models/incident.dart';
 import '../models/incident_enums.dart';
 import '../models/incident_status_change.dart';
@@ -8,14 +9,14 @@ abstract final class IncidentDemoData {
     DateTime? createdAt,
     DelayEstimator estimator = const DelayEstimator(),
   }) {
-    final recordTime = createdAt ?? DateTime(2026, 8, 28, 8);
-    final reportedAt = DateTime(2026, 8, 28, 7, 55);
+    final recordTime = createdAt?.toUtc() ?? DateTime.utc(2026, 8, 28);
+    final reportedAt = DateTime.utc(2026, 8, 27, 23, 55);
     final estimate = estimator.estimate(
       incidentType: IncidentType.vehicleBreakdown,
       severity: IncidentSeverity.high,
       vehicleCondition: VehicleCondition.immobilised,
       disruptionScope: DisruptionScope.partialObstruction,
-      reportedAt: reportedAt,
+      reportedAt: MalaysiaTime.instantToWallClock(reportedAt),
     );
 
     return Incident(

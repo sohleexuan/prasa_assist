@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/time/malaysia_time.dart';
 import '../../../shared/widgets/app_error_state.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
 import '../../../shared/widgets/app_section_card.dart';
@@ -107,6 +108,7 @@ class _RecommendationDetailPageState extends State<RecommendationDetailPage> {
                 Text(
                   'Explainable confidence: ${(item.confidence * 100).round()}%',
                 ),
+                Text('Created: ${MalaysiaTime.formatDateTime(item.createdAt)}'),
                 for (final action in item.actions)
                   Padding(
                     padding: const EdgeInsets.only(top: AppSpacing.xs),
@@ -178,7 +180,7 @@ class _RecommendationDetailPageState extends State<RecommendationDetailPage> {
                   ? 'Accepted'
                   : 'Rejected',
               body: Text(
-                'Decision by ${item.decisionUserId ?? 'staff'} at ${item.decisionAt?.toIso8601String() ?? 'recorded time'}${item.decisionNote == null ? '' : '\nNote: ${item.decisionNote}'}',
+                'Decision by ${item.decisionUserId ?? 'staff'} at ${item.decisionAt == null ? 'recorded time' : MalaysiaTime.formatDateTime(item.decisionAt!)}${item.decisionNote == null ? '' : '\nNote: ${item.decisionNote}'}',
               ),
             ),
             if (item.status == RecommendationStatus.accepted) ...[

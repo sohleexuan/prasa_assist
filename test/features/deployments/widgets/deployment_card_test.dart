@@ -15,7 +15,10 @@ void main() {
     expect(find.text('Scheduled'), findsOneWidget);
     expect(find.text('2 vehicles'), findsOneWidget);
     expect(find.text('ABC 1230, DEF 4567'), findsOneWidget);
-    expect(find.text('2026-08-27 08:00 to 2026-08-27 10:00'), findsOneWidget);
+    expect(
+      find.text('2026-08-27 08:00 MYT to 2026-08-27 10:00 MYT'),
+      findsOneWidget,
+    );
     expect(
       find.text('Replace unavailable Bus B1023 during peak hour'),
       findsOneWidget,
@@ -36,7 +39,7 @@ void main() {
     expect(find.text('1 vehicles'), findsNothing);
   });
 
-  testWidgets('formats a UTC service window in device-local time', (
+  testWidgets('formats a UTC service window in fixed Malaysia time', (
     tester,
   ) async {
     final start = DateTime.utc(2026, 8, 27, 20, 40);
@@ -45,7 +48,7 @@ void main() {
     await _pumpCard(tester, _deployment(startTime: start, endTime: end));
 
     expect(
-      find.text('${_localText(start)} to ${_localText(end)}'),
+      find.text('${_malaysiaText(start)} to ${_malaysiaText(end)}'),
       findsOneWidget,
     );
   });
@@ -132,23 +135,23 @@ ServiceDeployment _deployment({
     routeId: '300',
     routeName: routeName,
     vehicleIds: vehicleIds,
-    startTime: startTime ?? DateTime(2026, 8, 27, 8),
-    endTime: endTime ?? DateTime(2026, 8, 27, 10),
+    startTime: startTime ?? DateTime.utc(2026, 8, 27),
+    endTime: endTime ?? DateTime.utc(2026, 8, 27, 2),
     status: DeploymentStatus.scheduled,
     purpose: purpose,
     createdBy: 'Demo Operations Staff',
-    createdAt: DateTime(2026, 8, 27, 7, 30),
-    updatedAt: DateTime(2026, 8, 27, 7, 45),
+    createdAt: DateTime.utc(2026, 8, 26, 23, 30),
+    updatedAt: DateTime.utc(2026, 8, 26, 23, 45),
     incidentId: incidentId,
     sourceRecommendationId: sourceRecommendationId,
   );
 }
 
-String _localText(DateTime value) {
-  final local = value.toLocal();
-  return '${local.year.toString().padLeft(4, '0')}-'
-      '${local.month.toString().padLeft(2, '0')}-'
-      '${local.day.toString().padLeft(2, '0')} '
-      '${local.hour.toString().padLeft(2, '0')}:'
-      '${local.minute.toString().padLeft(2, '0')}';
+String _malaysiaText(DateTime value) {
+  final malaysia = value.toUtc().add(const Duration(hours: 8));
+  return '${malaysia.year.toString().padLeft(4, '0')}-'
+      '${malaysia.month.toString().padLeft(2, '0')}-'
+      '${malaysia.day.toString().padLeft(2, '0')} '
+      '${malaysia.hour.toString().padLeft(2, '0')}:'
+      '${malaysia.minute.toString().padLeft(2, '0')} MYT';
 }
