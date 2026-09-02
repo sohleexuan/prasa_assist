@@ -5,23 +5,25 @@ import 'package:prasa_assist/features/work_orders/repositories/work_order_data_e
 
 void main() {
   final now = DateTime(2026, 8, 27);
-  WorkOrder record(String id,
-          {String description = 'Inspect vehicle', String? routeId = '300'}) =>
-      WorkOrder(
-        workOrderId: id,
-        incidentId: 'INC-1',
-        recommendationId: 'REC-1',
-        routeId: routeId,
-        vehicleId: 'B1023',
-        taskType: 'Inspection',
-        description: description,
-        priority: WorkOrderPriority.urgent,
-        status: WorkOrderStatus.draft,
-        createdByUserId: '11111111-1111-4111-8111-111111111111',
-        createdBy: 'Staff A',
-        createdAt: now,
-        updatedAt: now,
-      );
+  WorkOrder record(
+    String id, {
+    String description = 'Inspect vehicle',
+    String? routeId = '300',
+  }) => WorkOrder(
+    workOrderId: id,
+    incidentId: 'INC-1',
+    recommendationId: 'REC-1',
+    routeId: routeId,
+    vehicleId: 'B1023',
+    taskType: 'Inspection',
+    description: description,
+    priority: WorkOrderPriority.urgent,
+    status: WorkOrderStatus.draft,
+    createdByUserId: '11111111-1111-4111-8111-111111111111',
+    createdBy: 'Staff A',
+    createdAt: now,
+    updatedAt: now,
+  );
 
   test('creates, reads, and updates local records', () async {
     final repository = InMemoryWorkOrderRepository(initialWorkOrders: []);

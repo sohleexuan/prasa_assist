@@ -153,48 +153,50 @@ void main() {
     );
   });
 
-  test('copyWith clears mutable nullable fields and preserves Route linkage',
-      () {
-    final value = WorkOrder(
-      workOrderId: 'WO-1',
-      incidentId: 'INC-1',
-      recommendationId: 'REC-1',
-      routeId: '300',
-      vehicleId: 'B1023',
-      taskType: 'Inspection',
-      description: 'Inspect vehicle',
-      priority: WorkOrderPriority.high,
-      assignedTo: 'Staff B',
-      scheduledStart: createdAt,
-      scheduledEnd: createdAt.add(const Duration(hours: 1)),
-      status: WorkOrderStatus.open,
-      notes: 'Note',
-      createdByUserId: '11111111-1111-4111-8111-111111111111',
-      createdBy: 'Staff A',
-      createdAt: createdAt,
-      updatedAt: createdAt,
-      remoteVersion: 2,
-    );
-    final cleared = value.copyWith(
-      incidentId: null,
-      recommendationId: null,
-      assignedTo: null,
-      scheduledStart: null,
-      scheduledEnd: null,
-      notes: null,
-      completedAt: null,
-      cancelledAt: null,
-      remoteVersion: null,
-    );
-    expect(cleared.incidentId, isNull);
-    expect(cleared.recommendationId, isNull);
-    expect(cleared.routeId, '300');
-    expect(cleared.assignedTo, isNull);
-    expect(cleared.scheduledStart, isNull);
-    expect(cleared.scheduledEnd, isNull);
-    expect(cleared.notes, isNull);
-    expect(cleared.remoteVersion, isNull);
-  });
+  test(
+    'copyWith clears mutable nullable fields and preserves Route linkage',
+    () {
+      final value = WorkOrder(
+        workOrderId: 'WO-1',
+        incidentId: 'INC-1',
+        recommendationId: 'REC-1',
+        routeId: '300',
+        vehicleId: 'B1023',
+        taskType: 'Inspection',
+        description: 'Inspect vehicle',
+        priority: WorkOrderPriority.high,
+        assignedTo: 'Staff B',
+        scheduledStart: createdAt,
+        scheduledEnd: createdAt.add(const Duration(hours: 1)),
+        status: WorkOrderStatus.open,
+        notes: 'Note',
+        createdByUserId: '11111111-1111-4111-8111-111111111111',
+        createdBy: 'Staff A',
+        createdAt: createdAt,
+        updatedAt: createdAt,
+        remoteVersion: 2,
+      );
+      final cleared = value.copyWith(
+        incidentId: null,
+        recommendationId: null,
+        assignedTo: null,
+        scheduledStart: null,
+        scheduledEnd: null,
+        notes: null,
+        completedAt: null,
+        cancelledAt: null,
+        remoteVersion: null,
+      );
+      expect(cleared.incidentId, isNull);
+      expect(cleared.recommendationId, isNull);
+      expect(cleared.routeId, '300');
+      expect(cleared.assignedTo, isNull);
+      expect(cleared.scheduledStart, isNull);
+      expect(cleared.scheduledEnd, isNull);
+      expect(cleared.notes, isNull);
+      expect(cleared.remoteVersion, isNull);
+    },
+  );
 
   test('uses package-free value equality and hashCode', () {
     final first = WorkOrder(
