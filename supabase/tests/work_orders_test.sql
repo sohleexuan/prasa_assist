@@ -12,6 +12,7 @@ select ok((select relrowsecurity from pg_class where oid='public.work_orders'::r
 select policies_are('public','work_orders',array['work_orders_authenticated_read'],'only shared authenticated read policy exists');
 select ok(not has_table_privilege('authenticated','public.work_orders','SELECT'),'authenticated has no table-wide SELECT grant');
 select ok(has_column_privilege('authenticated','public.work_orders','work_order_id','SELECT'),'authenticated can read DTO identity columns');
+select ok(has_column_privilege('authenticated','public.work_orders','route_id','SELECT'),'authenticated can read Route linkage');
 select ok(not has_table_privilege('authenticated','public.work_orders','INSERT'),'direct authenticated insert is denied');
 select ok(not has_table_privilege('authenticated','public.work_orders','UPDATE'),'direct authenticated update is denied');
 select ok(not has_table_privilege('authenticated','public.work_orders','DELETE'),'direct authenticated delete is denied');
@@ -24,6 +25,8 @@ select function_returns('public','update_work_order',array['text','jsonb','bigin
 select function_returns('public','assign_work_order',array['text','text','bigint'],'jsonb','assignment RPC returns DTO JSON');
 select function_returns('public','transition_work_order',array['text','text','bigint'],'jsonb','transition RPC returns DTO JSON');
 select ok(not exists(select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname~*'delete.*work_order|work_order.*delete'),'no delete RPC exists');
+select ok(exists(select 1 from pg_trigger where tgrelid='public.work_orders'::regclass and tgname='enforce_work_order_schedule_integrity' and tgenabled='O'),'lifecycle-aware schedule trigger is enabled');
+select ok(not has_function_privilege('authenticated','public.enforce_work_order_schedule_integrity()','EXECUTE'),'schedule trigger function is not client-callable');
 
 select ok((select bool_and(p.prosecdef and p.proconfig@>array['search_path=""']) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('create_work_order','update_work_order','assign_work_order','transition_work_order')),'all write RPCs are SECURITY DEFINER with empty search_path');
 select ok((select bool_and(pg_get_functiondef(p.oid)!~'[^.]\m(work_orders|work_order_code_seq)\M' and pg_get_functiondef(p.oid)!~'[^.]\m(uid|jwt|digest)\s*\(') from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('create_work_order','update_work_order','assign_work_order','transition_work_order')),'SECURITY DEFINER protected references are schema-qualified');
@@ -38,14 +41,15 @@ select throws_ok($$select publication_request_snapshot from public.work_orders$$
 select throws_ok($$select publication_request_sha256 from public.work_orders$$,'42501',null,'authenticated staff cannot retrieve publication hash');
 select throws_ok($$insert into public.work_orders(id) values(extensions.gen_random_uuid())$$,'42501',null,'authenticated direct insert is denied');
 
-select lives_ok($$select public.create_work_order(' local-b1023 ', '{"incident_id":"INC-B1023-ROUTE-300","recommendation_id":"REC-INSPECT-B1023","vehicle_id":"b1023","task_type":"Inspection","description":"Inspect Bus B1023 after its Route 300 breakdown.","priority":"urgent","scheduled_start":"2026-08-30T08:00:00+08:00","scheduled_end":"2026-08-30T09:00:00+08:00","notes":"AI recommends. Staff decides."}'::jsonb)$$,'staff can explicitly publish a reviewed draft');
+select lives_ok($$select public.create_work_order(' local-b1023 ', '{"incident_id":"INC-B1023-ROUTE-300","recommendation_id":"REC-INSPECT-B1023","route_id":"300","vehicle_id":"b1023","task_type":"Inspection","description":"Inspect Bus B1023 after its Route 300 breakdown.","priority":"urgent","scheduled_start":"2026-08-30T08:00:00+08:00","scheduled_end":"2026-08-30T09:00:00+08:00","notes":"AI recommends. Staff decides."}'::jsonb)$$,'staff can explicitly publish a reviewed draft');
 select throws_ok($$select public.create_work_order('spoof-label','{"vehicle_id":"B1023","task_type":"Inspection","description":"Attempt spoof","priority":"high","created_by_label":"spoof@example.com"}'::jsonb)$$,'22023','Publication payload is invalid.','client cannot submit a confirmed creator label');
 select lives_ok($$select public.create_work_order('local-offset','{"vehicle_id":"B1023","task_type":"Inspection","description":"Offset accepted","priority":"high","scheduled_start":"2026-08-30T08:00:00+08:00","scheduled_end":"2026-08-30T09:00:00+08:00"}'::jsonb)$$,'numeric timezone offsets are accepted');
 select throws_ok($$select public.create_work_order('bad-date','{"vehicle_id":"B1023","task_type":"Inspection","description":"Bad date","priority":"high","scheduled_start":"2026-08-30","scheduled_end":"2026-08-30"}'::jsonb)$$,'22007',null,'date-only timestamps are rejected');
 select throws_ok($$select public.create_work_order('bad-local','{"vehicle_id":"B1023","task_type":"Inspection","description":"Bad local","priority":"high","scheduled_start":"2026-08-30T08:00:00","scheduled_end":"2026-08-30T09:00:00"}'::jsonb)$$,'22007',null,'timezone-free timestamps are rejected');
 select throws_ok($$select public.create_work_order('bad-relative','{"vehicle_id":"B1023","task_type":"Inspection","description":"Bad relative","priority":"high","scheduled_start":"tomorrow","scheduled_end":"tomorrow"}'::jsonb)$$,'22007',null,'relative timestamps are rejected');
 select throws_ok($$select public.create_work_order('half','{"vehicle_id":"B1023","task_type":"Inspection","description":"Half schedule","priority":"high","scheduled_start":"2026-08-30T08:00:00Z"}'::jsonb)$$,'22023','Provide a valid complete schedule.','half schedules are rejected');
-select throws_ok($$select public.create_work_order('reverse','{"vehicle_id":"B1023","task_type":"Inspection","description":"Reverse schedule","priority":"high","scheduled_start":"2026-08-30T09:00:00Z","scheduled_end":"2026-08-30T08:00:00Z"}'::jsonb)$$,'22023','Provide a valid complete schedule.','reversed schedules are rejected');
+select throws_ok($$select public.create_work_order('reverse','{"vehicle_id":"B1023","task_type":"Inspection","description":"Reverse schedule","priority":"high","scheduled_start":"2026-08-30T09:00:00Z","scheduled_end":"2026-08-30T08:00:00Z"}'::jsonb)$$,'22023','Scheduled end must be later than scheduled start.','reversed schedules are rejected');
+select throws_ok($$select public.create_work_order('equal','{"vehicle_id":"B1023","task_type":"Inspection","description":"Equal schedule","priority":"high","scheduled_start":"2026-08-30T08:00:00Z","scheduled_end":"2026-08-30T08:00:00Z"}'::jsonb)$$,'22023','Scheduled end must be later than scheduled start.','equal schedules are rejected');
 reset role;
 
 select is((select created_by_user_id from public.work_orders where publication_key='local-b1023'),'11111111-1111-4111-8111-111111111111'::uuid,'creator UUID comes from auth.uid');
@@ -53,6 +57,8 @@ select is((select created_by_label from public.work_orders where publication_key
 select is((select vehicle_id from public.work_orders where publication_key='local-b1023'),'B1023','vehicle ID is normalized');
 select is((select incident_id from public.work_orders where publication_key='local-b1023'),'INC-B1023-ROUTE-300','incident linkage is preserved');
 select is((select recommendation_id from public.work_orders where publication_key='local-b1023'),'REC-INSPECT-B1023','recommendation linkage is preserved');
+select is((select route_id from public.work_orders where publication_key='local-b1023'),'300','Route linkage is preserved');
+select ok((select publication_request_snapshot->>'route_id'='300' and publication_request_sha256=extensions.digest(convert_to(publication_request_snapshot::text,'UTF8'),'sha256') from public.work_orders where publication_key='local-b1023'),'canonical publication snapshot and hash include Route linkage');
 select is((select version from public.work_orders where publication_key='local-b1023'),1::bigint,'confirmed record starts at version one');
 select is((select created_at from public.work_orders where publication_key='local-b1023'),(select updated_at from public.work_orders where publication_key='local-b1023'),'creation captures one timestamp');
 select ok((select work_order_id~'^WO-[0-9]{8}-[0-9]{6}$' from public.work_orders where publication_key='local-b1023'),'server generates the public ID');
@@ -61,7 +67,7 @@ select is(substring((select work_order_id from public.work_orders where publicat
 set local timezone='UTC';
 
 set local role authenticated;
-select is((public.create_work_order('local-b1023','{"incident_id":"INC-B1023-ROUTE-300","recommendation_id":"REC-INSPECT-B1023","vehicle_id":"B1023","task_type":"Inspection","description":"Inspect Bus B1023 after its Route 300 breakdown.","priority":"urgent","scheduled_start":"2026-08-30T00:00:00Z","scheduled_end":"2026-08-30T01:00:00Z","notes":"AI recommends. Staff decides."}'::jsonb)->>'work_order_id'),(select work_order_id from public.work_orders where description='Inspect Bus B1023 after its Route 300 breakdown.'),'same canonical publication returns the same work order');
+select is((public.create_work_order('local-b1023','{"incident_id":"INC-B1023-ROUTE-300","recommendation_id":"REC-INSPECT-B1023","route_id":"300","vehicle_id":"B1023","task_type":"Inspection","description":"Inspect Bus B1023 after its Route 300 breakdown.","priority":"urgent","scheduled_start":"2026-08-30T00:00:00Z","scheduled_end":"2026-08-30T01:00:00Z","notes":"AI recommends. Staff decides."}'::jsonb)->>'work_order_id'),(select work_order_id from public.work_orders where description='Inspect Bus B1023 after its Route 300 breakdown.'),'same canonical publication returns the same work order');
 select throws_ok($$select public.create_work_order('local-b1023','{"vehicle_id":"B9999","task_type":"Inspection","description":"Different","priority":"urgent"}'::jsonb)$$,'40001','Publication key was already used for different content.','same publication key cannot represent different content');
 select lives_ok($$select public.transition_work_order((select work_order_id from public.work_orders where description='Inspect Bus B1023 after its Route 300 breakdown.'),'open',1)$$,'scheduled Draft can become Open');
 select lives_ok($$select public.assign_work_order((select work_order_id from public.work_orders where description='Inspect Bus B1023 after its Route 300 breakdown.'),'Technician A',2)$$,'Open can be explicitly assigned');
@@ -101,7 +107,7 @@ select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111'
 select set_config('request.jwt.claims','{"sub":"11111111-1111-4111-8111-111111111111","email":"staff.one@example.com","role":"authenticated"}',true);
 set local role authenticated;
 select lives_ok(
-  $$select public.create_work_order('shared-edit','{"incident_id":"INC-B1023-ROUTE-300","recommendation_id":"REC-INSPECT-B1023","vehicle_id":"B1023","task_type":"Inspection","description":"Created by first staff member","priority":"high","scheduled_start":"2026-08-30T08:00:00Z","scheduled_end":"2026-08-30T09:00:00Z"}'::jsonb)$$,
+  $$select public.create_work_order('shared-edit','{"incident_id":"INC-B1023-ROUTE-300","recommendation_id":"REC-INSPECT-B1023","route_id":"300","vehicle_id":"B1023","task_type":"Inspection","description":"Created by first staff member","priority":"high","scheduled_start":"2026-08-30T08:00:00Z","scheduled_end":"2026-08-30T09:00:00Z"}'::jsonb)$$,
   'first authenticated staff member creates a shared work order'
 );
 reset role;
@@ -118,10 +124,12 @@ select ok(
     and description='Reviewed by second staff member'
     and incident_id='INC-B1023-ROUTE-300'
     and recommendation_id='REC-INSPECT-B1023'
+    and route_id='300'
     and version=2
    from public.work_orders where publication_key='shared-edit'),
   'shared update preserves immutable creator and linkage while advancing version'
 );
+select throws_ok($$update public.work_orders set route_id='999' where publication_key='shared-edit'$$,'22023','Identity, linkage and audit fields are immutable.','Route linkage cannot be mutated');
 set local role authenticated;
 
 select ok(
@@ -166,7 +174,7 @@ set local role authenticated;
 select is(
   public.create_work_order(
     'canonical-optionals',
-    '{"incident_id":" ","recommendation_id":null,"vehicle_id":" b1023 ","task_type":" Inspection ","description":" Canonical optional values ","priority":" HIGH ","scheduled_start":"2026-08-30T08:00:00+08:00","scheduled_end":"2026-08-30T09:00:00+08:00","notes":" "}'::jsonb
+    '{"incident_id":" ","recommendation_id":null,"route_id":" ","vehicle_id":" b1023 ","task_type":" Inspection ","description":" Canonical optional values ","priority":" HIGH ","scheduled_start":"2026-08-30T08:00:00+08:00","scheduled_end":"2026-08-30T09:00:00+08:00","notes":" "}'::jsonb
   )->>'work_order_id',
   public.create_work_order(
     'canonical-optionals',
@@ -174,6 +182,58 @@ select is(
   )->>'work_order_id',
   'canonical comparison normalizes optional blanks, text, and equivalent offset/Z timestamps'
 );
+
+select lives_ok(
+  $$select public.create_work_order('legacy-proven-route','{"recommendation_id":"REC-INSPECT-B1023","route_id":"300","vehicle_id":"B1023","task_type":"Inspection","description":"Legacy proven route retry","priority":"high"}'::jsonb)$$,
+  'creates a row used to simulate legacy publication evidence'
+);
+select lives_ok(
+  $$select public.create_work_order('legacy-unproven-route','{"vehicle_id":"B1023","task_type":"Inspection","description":"Legacy unproven route retry","priority":"high"}'::jsonb)$$,
+  'creates a row used to simulate unproven legacy Route evidence'
+);
+reset role;
+alter table public.work_orders disable trigger enforce_work_order_update;
+update public.work_orders
+set publication_request_snapshot=publication_request_snapshot-'route_id',
+    publication_request_sha256=extensions.digest(convert_to((publication_request_snapshot-'route_id')::text,'UTF8'),'sha256')
+where publication_key in ('legacy-proven-route','legacy-unproven-route');
+alter table public.work_orders enable trigger enforce_work_order_update;
+create temporary table legacy_publication_evidence_before as
+select publication_key,publication_request_snapshot,publication_request_sha256
+from public.work_orders
+where publication_key in ('legacy-proven-route','legacy-unproven-route');
+set local role authenticated;
+select lives_ok(
+  $$select public.create_work_order('legacy-proven-route','{"recommendation_id":"REC-INSPECT-B1023","vehicle_id":"B1023","task_type":"Inspection","description":"Legacy proven route retry","priority":"high"}'::jsonb)$$,
+  'old-client retry without Route matches legacy publication evidence'
+);
+select lives_ok(
+  $$select public.create_work_order('legacy-proven-route','{"recommendation_id":"REC-INSPECT-B1023","route_id":"300","vehicle_id":"B1023","task_type":"Inspection","description":"Legacy proven route retry","priority":"high"}'::jsonb)$$,
+  'new-client retry with the proven matching Route succeeds'
+);
+select throws_ok(
+  $$select public.create_work_order('legacy-proven-route','{"recommendation_id":"REC-INSPECT-B1023","route_id":"301","vehicle_id":"B1023","task_type":"Inspection","description":"Legacy proven route retry","priority":"high"}'::jsonb)$$,
+  '40001','Publication key was already used for different content.','legacy retry with a conflicting Route fails closed'
+);
+select lives_ok(
+  $$select public.create_work_order('legacy-unproven-route','{"vehicle_id":"B1023","task_type":"Inspection","description":"Legacy unproven route retry","priority":"high"}'::jsonb)$$,
+  'old-client null Route retry succeeds when legacy fields match'
+);
+select throws_ok(
+  $$select public.create_work_order('legacy-unproven-route','{"route_id":"300","vehicle_id":"B1023","task_type":"Inspection","description":"Legacy unproven route retry","priority":"high"}'::jsonb)$$,
+  '40001','Publication key was already used for different content.','unproven non-null Route retry fails closed'
+);
+reset role;
+select ok(
+  (select bool_and(w.publication_request_snapshot is not distinct from b.publication_request_snapshot and w.publication_request_sha256 is not distinct from b.publication_request_sha256)
+   from public.work_orders w join legacy_publication_evidence_before b using(publication_key)),
+  'legacy retries preserve historical snapshot JSON and SHA-256 bytes exactly'
+);
+select ok(
+  (select publication_request_snapshot?'route_id' and publication_request_snapshot->>'route_id'='300' from public.work_orders where publication_key='local-b1023'),
+  'new publications explicitly store Route in their canonical snapshot'
+);
+set local role authenticated;
 
 select lives_ok($$select public.create_work_order('update-open','{"vehicle_id":"B1023","task_type":"Inspection","description":"Update conflict record","priority":"high","scheduled_start":"2026-08-30T08:00:00Z","scheduled_end":"2026-08-30T09:00:00Z"}'::jsonb)$$,'creates scheduled update record');
 select lives_ok($$select public.transition_work_order((select work_order_id from public.work_orders where description='Update conflict record'),'open',1)$$,'opens update record');
@@ -186,6 +246,10 @@ select throws_ok(
   $$select public.update_work_order((select work_order_id from public.work_orders where description='Update conflict record'),'{"vehicle_id":"B9999","task_type":"Inspection","description":"Stale write","priority":"high","scheduled_start":"2026-08-30T08:00:00Z","scheduled_end":"2026-08-30T09:00:00Z"}'::jsonb,1)$$,
   '40001','Work order changed. Refresh before saving.','stale expectedVersion rejects update'
 );
+select throws_ok(
+  $$select public.update_work_order((select work_order_id from public.work_orders where description='Update conflict record'),'{"vehicle_id":"B1023","task_type":"Inspection","description":"Equal schedule","priority":"high","scheduled_start":"2026-08-30T08:00:00Z","scheduled_end":"2026-08-30T08:00:00Z"}'::jsonb,2)$$,
+  '22023','Scheduled end must be later than scheduled start.','update rejects an equal schedule'
+);
 reset role;
 select ok(
   (select row(version,updated_at,vehicle_id,incident_id,recommendation_id,description) is not distinct from
@@ -195,7 +259,7 @@ select ok(
 );
 set local role authenticated;
 select throws_ok(
-  $$select public.update_work_order((select work_order_id from public.work_orders where description='Update conflict record'),'{"vehicle_id":"B1023","task_type":"Inspection","description":"Injection","priority":"high","scheduled_start":"2026-08-30T08:00:00Z","scheduled_end":"2026-08-30T09:00:00Z","incident_id":"INJECT","recommendation_id":"INJECT","status":"completed","created_by_user_id":"11111111-1111-4111-8111-111111111111","created_at":"2026-08-30T08:00:00Z","updated_at":"2026-08-30T08:00:00Z","version":99}'::jsonb,2)$$,
+  $$select public.update_work_order((select work_order_id from public.work_orders where description='Update conflict record'),'{"vehicle_id":"B1023","task_type":"Inspection","description":"Injection","priority":"high","scheduled_start":"2026-08-30T08:00:00Z","scheduled_end":"2026-08-30T09:00:00Z","incident_id":"INJECT","recommendation_id":"INJECT","route_id":"INJECT","status":"completed","created_by_user_id":"11111111-1111-4111-8111-111111111111","created_at":"2026-08-30T08:00:00Z","updated_at":"2026-08-30T08:00:00Z","version":99}'::jsonb,2)$$,
   '22023','Update payload is invalid.','update payload cannot inject linkage, identity, status, audit fields or version'
 );
 select throws_ok(
@@ -214,6 +278,36 @@ select throws_ok(
   $$select public.update_work_order((select work_order_id from public.work_orders where description='Update conflict record'),'{"vehicle_id":"B1023","task_type":"Inspection","description":"Clear schedule","priority":"high"}'::jsonb,2)$$,
   '22023','This status requires a schedule.','Open work order cannot clear its schedule'
 );
+
+reset role;
+alter table public.work_orders disable trigger enforce_work_order_schedule_integrity;
+insert into public.work_orders(work_order_id,publication_key,publication_request_snapshot,publication_request_sha256,vehicle_id,task_type,description,priority,scheduled_start,scheduled_end,status,created_by_user_id,created_by_label,created_at,updated_at,version)
+values
+  ('WO-20260830-999996','legacy-equality-cancel','{}'::jsonb,extensions.digest('{}','sha256'),'B1023','Inspection','Legacy equality cancellation','high','2026-08-30T08:00:00Z','2026-08-30T08:00:00Z','draft','11111111-1111-4111-8111-111111111111','staff','2026-08-30T07:00:00Z','2026-08-30T07:00:00Z',1),
+  ('WO-20260830-999997','legacy-equality-correct','{}'::jsonb,extensions.digest('{}','sha256'),'B1023','Inspection','Legacy equality correction','high','2026-08-30T08:00:00Z','2026-08-30T08:00:00Z','draft','11111111-1111-4111-8111-111111111111','staff','2026-08-30T07:00:00Z','2026-08-30T07:00:00Z',1);
+alter table public.work_orders enable trigger enforce_work_order_schedule_integrity;
+set local role authenticated;
+select throws_ok(
+  $$select public.transition_work_order('WO-20260830-999996','open',1)$$,
+  '23514','Correct the legacy schedule before changing this work order.','legacy equality row cannot Open'
+);
+select lives_ok(
+  $$select public.transition_work_order('WO-20260830-999996','cancelled',1)$$,
+  'legacy equality row can be cancelled with its schedule unchanged'
+);
+select lives_ok(
+  $$select public.update_work_order('WO-20260830-999997','{"vehicle_id":"B1023","task_type":"Inspection","description":"Legacy equality correction","priority":"high","scheduled_start":"2026-08-30T08:00:00Z","scheduled_end":"2026-08-30T09:00:00Z"}'::jsonb,1)$$,
+  'legacy equality row can be corrected to a strict schedule'
+);
+reset role;
+select ok((select status='cancelled' and scheduled_end=scheduled_start from public.work_orders where publication_key='legacy-equality-cancel'),'legacy cancellation preserves the historical schedule');
+select ok((select scheduled_end>scheduled_start from public.work_orders where publication_key='legacy-equality-correct'),'legacy correction stores a strict schedule');
+select throws_ok(
+  $$insert into public.work_orders(work_order_id,publication_key,publication_request_snapshot,publication_request_sha256,vehicle_id,task_type,description,priority,scheduled_start,scheduled_end,status,created_by_user_id,created_by_label,created_at,updated_at,cancelled_at,version)
+    values('WO-20260830-999995','new-invalid-cancelled','{}'::jsonb,extensions.digest('{}','sha256'),'B1023','Inspection','Invalid cancelled creation','high','2026-08-30T08:00:00Z','2026-08-30T08:00:00Z','cancelled','11111111-1111-4111-8111-111111111111','staff','2026-08-30T07:00:00Z','2026-08-30T07:00:00Z','2026-08-30T07:00:00Z',1)$$,
+  '23514','Scheduled end must be later than scheduled start.','new invalid row cannot bypass strict ordering by starting Cancelled'
+);
+set local role authenticated;
 
 select ok(
   (select status='draft' and scheduled_start is null and scheduled_end is null from public.work_orders where description='UUID label fallback'),

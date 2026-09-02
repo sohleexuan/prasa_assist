@@ -160,6 +160,7 @@ void main() {
       expect(callbackCalls, 1);
       expect(received!.incidentId, 'INC-1');
       expect(received!.recommendationId, 'rec-1');
+      expect(received!.routeId, '300');
       expect(received!.vehicleId, 'B1023');
       expect(received!.taskType, 'Vehicle inspection');
       expect(
@@ -169,7 +170,8 @@ void main() {
       expect(received!.priority, WorkOrderPriority.high);
       expect(
         received!.notes,
-        'AI-generated summary (review before saving): Review B1023.',
+        'Inspect or repair B1023 as directed by the accepted recommendation. '
+        'Staff must verify the vehicle condition.',
       );
       expect(find.byType(RecommendationDetailPage), findsOneWidget);
     },

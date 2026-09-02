@@ -29,7 +29,7 @@ void main() {
 
     expect(
       (await upgraded.rawQuery('PRAGMA user_version')).single['user_version'],
-      6,
+      7,
     );
     expect(
       (await upgraded.query(
@@ -37,7 +37,7 @@ void main() {
         orderBy: 'version ASC',
       ))
           .map((row) => row['version']),
-      [1, 2, 3, 4, 5, 6],
+      [1, 2, 3, 4, 5, 6, 7],
     );
     expect(
       (await upgraded.query(

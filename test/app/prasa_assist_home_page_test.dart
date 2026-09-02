@@ -354,8 +354,10 @@ void main() {
       );
       expect(form.prefill!.incidentId, 'INC-B1023-300');
       expect(form.prefill!.recommendationId, 'REC-B1023-300');
+      expect(form.prefill!.routeId, '300');
       expect(form.prefill!.priority, WorkOrderPriority.high);
-      expect(form.prefill!.notes, contains('AI-generated summary'));
+      expect(form.prefill!.notes, contains('Inspect or repair B1023'));
+      expect(form.prefill!.notes, isNot(contains('replacement')));
       expect(database.insertCount, 0);
 
       await tester.drag(find.byType(ListView).last, const Offset(0, -500));
@@ -375,6 +377,7 @@ void main() {
         database.lastInsertValues,
         containsPair('recommendation_id', 'REC-B1023-300'),
       );
+      expect(database.lastInsertValues, containsPair('route_id', '300'));
       expect(database.lastInsertValues, containsPair('vehicle_id', 'B1023'));
       expect(
         database.lastInsertValues,
@@ -387,7 +390,7 @@ void main() {
       );
       expect(
         database.lastInsertValues!['notes'],
-        contains('AI-generated summary'),
+        contains('Inspect or repair B1023'),
       );
     },
   );

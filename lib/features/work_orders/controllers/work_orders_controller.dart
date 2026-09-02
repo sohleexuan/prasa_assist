@@ -193,6 +193,7 @@ class WorkOrdersController extends ChangeNotifier {
   Future<WorkOrder> createDraft({
     String? incidentId,
     String? recommendationId,
+    String? routeId,
     required String vehicleId,
     required String taskType,
     required String description,
@@ -207,6 +208,7 @@ class WorkOrdersController extends ChangeNotifier {
         LocalWorkOrderDraft(
           incidentId: incidentId,
           recommendationId: recommendationId,
+          routeId: routeId,
           vehicleId: vehicleId,
           taskType: taskType,
           description: description,
@@ -225,6 +227,7 @@ class WorkOrdersController extends ChangeNotifier {
       workOrderId: 'WO-LOCAL-${now.microsecondsSinceEpoch}-${_nextLocalId++}',
       incidentId: _optional(incidentId),
       recommendationId: _optional(recommendationId),
+      routeId: _optional(routeId),
       vehicleId: vehicleId.trim(),
       taskType: taskType.trim(),
       description: description.trim(),
@@ -264,6 +267,7 @@ class WorkOrdersController extends ChangeNotifier {
           LocalWorkOrderDraft(
             incidentId: local.draft.incidentId,
             recommendationId: local.draft.recommendationId,
+            routeId: local.draft.routeId,
             vehicleId: vehicleId,
             taskType: taskType,
             description: description,
@@ -303,6 +307,7 @@ class WorkOrdersController extends ChangeNotifier {
       workOrderId: current.workOrderId,
       incidentId: current.incidentId,
       recommendationId: current.recommendationId,
+      routeId: current.routeId,
       vehicleId: vehicleId.trim(),
       taskType: taskType.trim(),
       description: description.trim(),
@@ -431,9 +436,9 @@ class WorkOrdersController extends ChangeNotifier {
         'A scheduled start and end are required before continuing.',
       );
     }
-    if (workOrder.scheduledEnd!.isBefore(workOrder.scheduledStart!)) {
+    if (!workOrder.scheduledEnd!.isAfter(workOrder.scheduledStart!)) {
       throw const WorkOrderValidationException(
-        'Scheduled end cannot be earlier than scheduled start.',
+        'Scheduled end must be later than scheduled start.',
       );
     }
   }
@@ -456,6 +461,7 @@ class WorkOrdersController extends ChangeNotifier {
       workOrderId: current.workOrderId,
       incidentId: current.incidentId,
       recommendationId: current.recommendationId,
+      routeId: current.routeId,
       vehicleId: current.vehicleId,
       taskType: current.taskType,
       description: current.description,
@@ -471,6 +477,9 @@ class WorkOrdersController extends ChangeNotifier {
       updatedAt: now,
       completedAt: status == WorkOrderStatus.completed ? now : null,
       cancelledAt: status == WorkOrderStatus.cancelled ? now : null,
+      allowLegacyScheduleEquality:
+          status == WorkOrderStatus.cancelled &&
+          current.hasLegacyScheduleEquality,
     );
     await _repository!.update(updated);
     await load();
@@ -568,6 +577,7 @@ class WorkOrdersController extends ChangeNotifier {
     workOrderId: record.localId,
     incidentId: record.draft.incidentId,
     recommendationId: record.draft.recommendationId,
+    routeId: record.draft.routeId,
     vehicleId: record.draft.vehicleId,
     taskType: record.draft.taskType,
     description: record.draft.description,
@@ -580,5 +590,6 @@ class WorkOrdersController extends ChangeNotifier {
     createdBy: record.draft.createdByLabel,
     createdAt: record.localCreatedAt,
     updatedAt: record.localModifiedAt,
+    allowLegacyScheduleEquality: record.draft.hasLegacyScheduleEquality,
   );
 }

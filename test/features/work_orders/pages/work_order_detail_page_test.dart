@@ -17,6 +17,9 @@ void main() {
   WorkOrder record({WorkOrderStatus status = WorkOrderStatus.draft}) =>
       WorkOrder(
         workOrderId: 'WO-DEMO-001',
+        incidentId: 'INC-VERY-LONG-123456789012345678901234567890',
+        recommendationId: 'REC-VERY-LONG-123456789012345678901234567890',
+        routeId: '300',
         vehicleId: 'B1023',
         taskType: 'Vehicle inspection',
         description: 'Inspect breakdown on Route 300.',
@@ -62,8 +65,32 @@ void main() {
     expect(find.text('2026-08-28 09:00 MYT'), findsOneWidget);
     expect(find.text('2026-08-28 11:00 MYT'), findsOneWidget);
     expect(find.text('2026-08-27 09:00 MYT'), findsNWidgets(2));
-    await tester.drag(find.byType(ListView), const Offset(0, -700));
-    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Linked records'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Linked records'), findsOneWidget);
+    expect(
+      find.widgetWithText(
+        SelectableText,
+        'INC-VERY-LONG-123456789012345678901234567890',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.widgetWithText(
+        SelectableText,
+        'REC-VERY-LONG-123456789012345678901234567890',
+      ),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(SelectableText, '300'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.textContaining('AI recommends. Staff decides.'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(
       find.textContaining('AI recommends. Staff decides.'),
       findsOneWidget,

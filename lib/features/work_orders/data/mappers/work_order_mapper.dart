@@ -9,6 +9,7 @@ class WorkOrderMapper {
     workOrderId: record.workOrderId,
     incidentId: record.incidentId,
     recommendationId: record.recommendationId,
+    routeId: record.routeId,
     vehicleId: record.vehicleId,
     taskType: record.taskType,
     description: record.description,
@@ -25,6 +26,7 @@ class WorkOrderMapper {
     completedAt: record.completedAt,
     cancelledAt: record.cancelledAt,
     remoteVersion: record.remoteVersion,
+    allowLegacyScheduleEquality: record.hasLegacyScheduleEquality,
   );
 
   WorkOrderRecordDto toDto(WorkOrder workOrder, {required String storageId}) {
@@ -45,6 +47,7 @@ class WorkOrderMapper {
       workOrderId: workOrder.workOrderId,
       incidentId: workOrder.incidentId,
       recommendationId: workOrder.recommendationId,
+      routeId: workOrder.routeId,
       vehicleId: workOrder.vehicleId,
       taskType: workOrder.taskType,
       description: workOrder.description,

@@ -20,7 +20,7 @@ class SupabaseWorkOrderGateway implements WorkOrderSupabaseGateway {
   SupabaseWorkOrderGateway(this._client);
 
   static const selection =
-      'id,work_order_id,incident_id,recommendation_id,vehicle_id,task_type,'
+      'id,work_order_id,incident_id,recommendation_id,route_id,vehicle_id,task_type,'
       'description,priority,assigned_to,scheduled_start,scheduled_end,status,'
       'notes,created_by_user_id,created_by_label,created_at,updated_at,'
       'completed_at,cancelled_at,version';
@@ -91,6 +91,7 @@ class SupabaseWorkOrderRemoteDataSource implements WorkOrderRemoteDataSource {
         'p_payload': <String, dynamic>{
           'incident_id': draft.incidentId,
           'recommendation_id': draft.recommendationId,
+          'route_id': draft.routeId,
           'vehicle_id': draft.vehicleId,
           'task_type': draft.taskType,
           'description': draft.description,

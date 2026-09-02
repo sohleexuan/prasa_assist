@@ -17,19 +17,22 @@ class RecommendationWorkOrderPrefillFactory {
         'Only an accepted inspection recommendation can be handed off.',
       );
     }
-    final summary = record.analysis?.summary;
+    final action = recommendation.actions
+        .whereType<InspectOrRepairVehicleAction>()
+        .first;
     return WorkOrderPrefill(
       incidentId: recommendation.incidentId,
       recommendationId: recommendation.id,
-      vehicleId: recommendation.vehicleId,
+      routeId: recommendation.routeId,
+      vehicleId: action.vehicleId,
       taskType: 'Vehicle inspection',
       description:
-          'Inspect ${recommendation.vehicleId} following the confirmed '
+          'Inspect ${action.vehicleId} following the confirmed '
           'breakdown recommendation.',
       priority: WorkOrderPriority.high,
-      notes: summary == null
-          ? null
-          : 'AI-generated summary (review before saving): $summary',
+      notes:
+          'Inspect or repair ${action.vehicleId} as directed by the accepted '
+          'recommendation. Staff must verify the vehicle condition.',
     );
   }
 }

@@ -90,6 +90,7 @@ void main() {
         expect(fixture.remote.createdDraft, same(draft));
         expect(result.incidentId, 'INC-300');
         expect(result.recommendationId, 'REC-INSPECT-B1023');
+        expect(result.routeId, '300');
         expect(fixture.remote.publicationKey, local.localId);
         expect(
           fixture.local.cached.single.syncState,
@@ -130,6 +131,35 @@ void main() {
       gate.complete(_confirmed());
       await first;
       expect(fixture.remote.createCalls, 1);
+    });
+
+    test('legacy equality draft remains readable but cannot publish', () async {
+      final fixture = _Fixture();
+      final instant = DateTime.utc(2026, 9, 2, 1);
+      final local = await fixture.repository.createLocalDraft(
+        LocalWorkOrderDraft(
+          vehicleId: 'B1023',
+          taskType: 'Inspection',
+          description: 'Legacy equality draft',
+          priority: WorkOrderPriority.high,
+          scheduledStart: instant,
+          scheduledEnd: instant,
+          createdByLabel: 'Staff A',
+          allowLegacyScheduleEquality: true,
+        ),
+      );
+
+      expect(
+        (await fixture.repository.readLocalWorkItem(local.localId))
+            ?.draft
+            .hasLegacyScheduleEquality,
+        isTrue,
+      );
+      await expectLater(
+        fixture.repository.publishLocalDraft(local.localId),
+        throwsA(isA<WorkOrderValidationException>()),
+      );
+      expect(fixture.remote.createCalls, 0);
     });
 
     test(
@@ -174,6 +204,13 @@ void main() {
 
     test('uses enum statuses and version for remote transition', () async {
       final fixture = _Fixture();
+      fixture.remote.records = [
+        _confirmed(
+          status: WorkOrderStatus.assigned,
+          assignedTo: 'Technician A',
+          version: 3,
+        ),
+      ];
       fixture.remote.transitionResult = _confirmed(
         status: WorkOrderStatus.inProgress,
         assignedTo: 'Technician A',
@@ -189,6 +226,30 @@ void main() {
 
       expect(fixture.remote.toStatus, WorkOrderStatus.inProgress);
       expect(fixture.remote.expectedVersion, 3);
+    });
+
+    test('legacy equality record can be cancelled and hydrated', () async {
+      final fixture = _Fixture();
+      final instant = DateTime.utc(2026, 9, 2, 1);
+      fixture.remote.transitionResult = _confirmed(
+        status: WorkOrderStatus.cancelled,
+        version: 3,
+        scheduledStart: instant,
+        scheduledEnd: instant,
+        allowLegacyScheduleEquality: true,
+      );
+
+      final result = await fixture.repository.transitionConfirmed(
+        'WO-0001',
+        fromStatus: WorkOrderStatus.draft,
+        toStatus: WorkOrderStatus.cancelled,
+        expectedVersion: 2,
+      );
+
+      expect(fixture.remote.transitionCalls, 1);
+      expect(fixture.remote.toStatus, WorkOrderStatus.cancelled);
+      expect(result.status, WorkOrderStatus.cancelled);
+      expect(result.hasLegacyScheduleEquality, isTrue);
     });
   });
 }
@@ -399,6 +460,7 @@ class _FakeLocal implements WorkOrderLocalDataSource {
 LocalWorkOrderDraft _draft() => LocalWorkOrderDraft(
   incidentId: 'INC-300',
   recommendationId: 'REC-INSPECT-B1023',
+  routeId: '300',
   vehicleId: 'B1023',
   taskType: 'Inspection',
   description: 'Inspect Bus B1023 after its Route 300 breakdown.',
@@ -428,6 +490,7 @@ LocalWorkOrderRecord _cached(
   draft: LocalWorkOrderDraft(
     incidentId: dto.incidentId,
     recommendationId: dto.recommendationId,
+    routeId: dto.routeId,
     vehicleId: dto.vehicleId,
     taskType: dto.taskType,
     description: dto.description,
@@ -436,6 +499,7 @@ LocalWorkOrderRecord _cached(
     scheduledEnd: dto.scheduledEnd,
     notes: dto.notes,
     createdByLabel: dto.createdByLabel,
+    allowLegacyScheduleEquality: dto.hasLegacyScheduleEquality,
   ),
   status: dto.status,
   syncState: LocalSyncState.cachedRemote,
@@ -456,20 +520,30 @@ WorkOrderRecordDto _confirmed({
   WorkOrderStatus status = WorkOrderStatus.open,
   String? assignedTo,
   int version = 2,
+  DateTime? scheduledStart,
+  DateTime? scheduledEnd,
+  bool allowLegacyScheduleEquality = false,
 }) => WorkOrderRecordDto(
   storageId: '22222222-2222-4222-8222-222222222222',
   workOrderId: 'WO-0001',
   incidentId: 'INC-300',
   recommendationId: 'REC-INSPECT-B1023',
+  routeId: '300',
   vehicleId: 'B1023',
   taskType: 'Inspection',
   description: 'Inspect Bus B1023 after its Route 300 breakdown.',
   priority: WorkOrderPriority.urgent,
   assignedTo: assignedTo,
+  scheduledStart: scheduledStart,
+  scheduledEnd: scheduledEnd,
   status: status,
   createdByUserId: '33333333-3333-4333-8333-333333333333',
   createdByLabel: 'Operations staff',
   createdAt: DateTime.utc(2026, 8, 30, 10),
   updatedAt: DateTime.utc(2026, 8, 30, 11),
+  cancelledAt: status == WorkOrderStatus.cancelled
+      ? DateTime.utc(2026, 8, 30, 11)
+      : null,
   remoteVersion: version,
+  allowLegacyScheduleEquality: allowLegacyScheduleEquality,
 );

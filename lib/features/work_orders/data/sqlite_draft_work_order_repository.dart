@@ -60,6 +60,7 @@ class SqliteDraftWorkOrderRepository implements WorkOrderRepository {
   LocalWorkOrderDraft _toDraft(WorkOrder workOrder) => LocalWorkOrderDraft(
     incidentId: workOrder.incidentId,
     recommendationId: workOrder.recommendationId,
+    routeId: workOrder.routeId,
     vehicleId: workOrder.vehicleId,
     taskType: workOrder.taskType,
     description: workOrder.description,
@@ -78,6 +79,7 @@ class SqliteDraftWorkOrderRepository implements WorkOrderRepository {
       workOrderId: record.localId,
       incidentId: record.draft.incidentId,
       recommendationId: record.draft.recommendationId,
+      routeId: record.draft.routeId,
       vehicleId: record.draft.vehicleId,
       taskType: record.draft.taskType,
       description: record.draft.description,
@@ -90,6 +92,7 @@ class SqliteDraftWorkOrderRepository implements WorkOrderRepository {
       createdBy: record.draft.createdByLabel,
       createdAt: record.localCreatedAt,
       updatedAt: record.localModifiedAt,
+      allowLegacyScheduleEquality: record.draft.hasLegacyScheduleEquality,
     );
   }
 }

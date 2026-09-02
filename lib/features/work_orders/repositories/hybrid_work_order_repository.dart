@@ -129,6 +129,16 @@ class HybridWorkOrderRepository implements WorkOrderHybridOperations {
       );
     }
     try {
+      final draftRecord = await _localDataSource.readLocalWorkItem(id);
+      if (draftRecord == null) {
+        throw const WorkOrderNotFoundException(
+          'The local work order was not found.',
+        );
+      }
+      validateWorkOrderSchedule(
+        draftRecord.draft.scheduledStart,
+        draftRecord.draft.scheduledEnd,
+      );
       final pending = await _localDataSource.markPendingPublication(id);
       late final WorkOrderRecordDto confirmed;
       try {
@@ -187,6 +197,7 @@ class HybridWorkOrderRepository implements WorkOrderHybridOperations {
     required String assignedTo,
     required int expectedVersion,
   }) async {
+    await _requireRemoteScheduleIntegrity(workOrderId);
     final updated = await _remoteDataSource.assign(
       _required(workOrderId, 'Work-order ID'),
       assignedTo: _required(assignedTo, 'Responsible staff'),
@@ -207,6 +218,9 @@ class HybridWorkOrderRepository implements WorkOrderHybridOperations {
       throw WorkOrderValidationException(
         'Cannot change work-order status from ${fromStatus.label} to ${toStatus.label}.',
       );
+    }
+    if (toStatus != WorkOrderStatus.cancelled) {
+      await _requireRemoteScheduleIntegrity(workOrderId);
     }
     final updated = await _remoteDataSource.transitionStatus(
       _required(workOrderId, 'Work-order ID'),
@@ -300,6 +314,18 @@ class HybridWorkOrderRepository implements WorkOrderHybridOperations {
       );
     }
     return value;
+  }
+
+  Future<void> _requireRemoteScheduleIntegrity(String workOrderId) async {
+    final record = await _remoteDataSource.fetchById(
+      _required(workOrderId, 'Work-order ID'),
+    );
+    if (record == null) {
+      throw const WorkOrderNotFoundException(
+        'The confirmed work order was not found.',
+      );
+    }
+    validateWorkOrderSchedule(record.scheduledStart, record.scheduledEnd);
   }
 
   String _required(String value, String label) {

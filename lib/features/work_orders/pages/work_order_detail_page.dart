@@ -118,14 +118,6 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
                             value: _format(workOrder.scheduledEnd),
                           ),
                           _DetailRow(
-                            label: 'Incident ID',
-                            value: workOrder.incidentId ?? 'Not linked',
-                          ),
-                          _DetailRow(
-                            label: 'Recommendation ID',
-                            value: workOrder.recommendationId ?? 'Not linked',
-                          ),
-                          _DetailRow(
                             label: 'Created by',
                             value: workOrder.createdBy,
                           ),
@@ -149,6 +141,26 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
                             label: 'Notes',
                             value: workOrder.notes ?? 'None',
                             showDivider: false,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    AppSectionCard(
+                      title: 'Linked records',
+                      body: Column(
+                        children: [
+                          _LinkedRecordRow(
+                            label: 'Incident ID',
+                            value: workOrder.incidentId,
+                          ),
+                          _LinkedRecordRow(
+                            label: 'Recommendation ID',
+                            value: workOrder.recommendationId,
+                          ),
+                          _LinkedRecordRow(
+                            label: 'Route ID',
+                            value: workOrder.routeId,
                           ),
                         ],
                       ),
@@ -193,12 +205,18 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
 
   Widget _buildActions(WorkOrder workOrder) {
     if (widget.controller.isLocalDraft(workOrder.workOrderId)) {
+      final legacyBlock = workOrder.hasLegacyScheduleEquality
+          ? 'Scheduled end must be later than scheduled start before this '
+                'legacy draft can be published.'
+          : null;
       return AppSectionCard(
         title: 'Draft review',
-        subtitle: 'Saving keeps this draft on the device. Publish only after staff review confirms that a shared work order should be created.',
+        subtitle: legacyBlock ?? 'Saving keeps this draft on the device. Publish only after staff review confirms that a shared work order should be created.',
         body: FilledButton.icon(
           key: const Key('publishWorkOrderAction'),
-          onPressed: _isWorking ? null : () => _confirmPublish(workOrder),
+          onPressed: _isWorking || legacyBlock != null
+              ? null
+              : () => _confirmPublish(workOrder),
           icon: const Icon(Icons.publish_outlined),
           label: const Text('Publish confirmed work order'),
         ),
@@ -532,6 +550,49 @@ class _DetailRow extends StatelessWidget {
         ),
         if (showDivider) const Divider(),
       ],
+    );
+  }
+}
+
+class _LinkedRecordRow extends StatelessWidget {
+  const _LinkedRecordRow({required this.label, required this.value});
+
+  final String label;
+  final String? value;
+
+  @override
+  Widget build(BuildContext context) {
+    final valueWidget = SelectableText(value ?? 'Not linked');
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 420) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: Theme.of(context).textTheme.labelLarge),
+                const SizedBox(height: AppSpacing.xs),
+                valueWidget,
+              ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 2,
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(flex: 3, child: valueWidget),
+            ],
+          );
+        },
+      ),
     );
   }
 }

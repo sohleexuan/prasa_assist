@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/time/malaysia_time.dart';
 import '../../../shared/widgets/app_error_state.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
+import '../../../shared/widgets/app_section_card.dart';
 import '../controllers/work_orders_controller.dart';
 import '../models/work_order.dart';
 import '../models/work_order_prefill.dart';
@@ -38,6 +40,17 @@ class _WorkOrderFormPageState extends State<WorkOrderFormPage> {
   String? _scheduleError;
 
   bool get _isEditing => widget.workOrder != null;
+  String? get _incidentId =>
+      widget.workOrder?.incidentId ?? widget.prefill?.incidentId;
+  String? get _recommendationId =>
+      widget.workOrder?.recommendationId ?? widget.prefill?.recommendationId;
+  String? get _routeId => widget.workOrder?.routeId ?? widget.prefill?.routeId;
+  String get _saveLabel =>
+      _isEditing &&
+          widget.workOrder!.remoteVersion != null &&
+          !widget.controller.isLocalDraft(widget.workOrder!.workOrderId)
+      ? 'Save changes'
+      : 'Save local draft';
 
   @override
   void initState() {
@@ -89,6 +102,7 @@ class _WorkOrderFormPageState extends State<WorkOrderFormPage> {
           child: Form(
             key: _formKey,
             child: ListView(
+              scrollCacheExtent: const ScrollCacheExtent.pixels(2000),
               padding: const EdgeInsets.all(AppSpacing.md),
               children: [
                 Text(
@@ -179,6 +193,26 @@ class _WorkOrderFormPageState extends State<WorkOrderFormPage> {
                   minLines: 2,
                   maxLines: 4,
                 ),
+                const SizedBox(height: AppSpacing.md),
+                AppSectionCard(
+                  title: 'Linked records',
+                  subtitle:
+                      'These identifiers are retained with the work order and '
+                      'cannot be edited here.',
+                  body: Column(
+                    children: [
+                      _LinkedRecordRow(
+                        label: 'Incident ID',
+                        value: _incidentId,
+                      ),
+                      _LinkedRecordRow(
+                        label: 'Recommendation ID',
+                        value: _recommendationId,
+                      ),
+                      _LinkedRecordRow(label: 'Route ID', value: _routeId),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.lg),
                 LayoutBuilder(
                   builder: (context, constraints) {
@@ -193,7 +227,7 @@ class _WorkOrderFormPageState extends State<WorkOrderFormPage> {
                       FilledButton(
                         key: const Key('saveWorkOrderButton'),
                         onPressed: _saving ? null : _save,
-                        child: Text(_saving ? 'Saving…' : 'Save local draft'),
+                        child: Text(_saving ? 'Saving…' : _saveLabel),
                       ),
                     ];
                     return compact
@@ -233,8 +267,8 @@ class _WorkOrderFormPageState extends State<WorkOrderFormPage> {
     if ((_scheduledStart == null) != (_scheduledEnd == null)) {
       error = 'Provide both scheduled start and scheduled end.';
     } else if (_scheduledStart != null &&
-        _scheduledEnd!.isBefore(_scheduledStart!)) {
-      error = 'Scheduled end cannot be earlier than scheduled start.';
+        !_scheduledEnd!.isAfter(_scheduledStart!)) {
+      error = 'Scheduled end must be later than scheduled start.';
     }
     setState(() => _scheduleError = error);
     return error == null;
@@ -290,6 +324,7 @@ class _WorkOrderFormPageState extends State<WorkOrderFormPage> {
         await widget.controller.createDraft(
           incidentId: widget.prefill?.incidentId,
           recommendationId: widget.prefill?.recommendationId,
+          routeId: widget.prefill?.routeId,
           vehicleId: _vehicleId.text,
           taskType: _taskType.text,
           description: _description.text,
@@ -312,6 +347,49 @@ class _WorkOrderFormPageState extends State<WorkOrderFormPage> {
       );
       setState(() => _saving = false);
     }
+  }
+}
+
+class _LinkedRecordRow extends StatelessWidget {
+  const _LinkedRecordRow({required this.label, required this.value});
+
+  final String label;
+  final String? value;
+
+  @override
+  Widget build(BuildContext context) {
+    final valueWidget = SelectableText(value ?? 'Not linked');
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 420) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: Theme.of(context).textTheme.labelLarge),
+                const SizedBox(height: AppSpacing.xs),
+                valueWidget,
+              ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 2,
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(flex: 3, child: valueWidget),
+            ],
+          );
+        },
+      ),
+    );
   }
 }
 

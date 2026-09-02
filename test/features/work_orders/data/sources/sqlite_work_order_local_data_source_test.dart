@@ -23,6 +23,7 @@ void main() {
       expect(created.ownerUserId, _ownerA);
       expect(created.draft.incidentId, 'INC-1');
       expect(created.draft.recommendationId, 'REC-1');
+      expect(created.draft.routeId, '300');
       expect(created.syncState, LocalSyncState.localDraft);
       expect(created.remoteStorageId, isNull);
     });
@@ -107,6 +108,7 @@ void main() {
       expect(cached?.createdByUserId, _creator);
       expect(cached?.incidentId, 'INC-1');
       expect(cached?.recommendationId, 'REC-1');
+      expect(cached?.routeId, '300');
     });
 
     test('enforces pending, failure, retry and conflict states', () async {
@@ -130,6 +132,34 @@ void main() {
       final reviewed = await source.updateDraft(conflict.localId, _draft());
       expect(reviewed.syncState, LocalSyncState.localDraft);
       expect(reviewed.safeErrorMessage, isNull);
+    });
+
+    test('local draft update cannot rewrite linked records', () async {
+      final database = createInMemoryTestDatabase();
+      addTearDown(database.close);
+      final source = _source(database, _ownerA);
+      final original = await source.createDraft(_draft());
+
+      await expectLater(
+        source.updateDraft(
+          original.localId,
+          LocalWorkOrderDraft(
+            incidentId: 'INC-1',
+            recommendationId: 'REC-1',
+            routeId: '999',
+            vehicleId: 'B1023',
+            taskType: 'Inspection',
+            description: 'Changed route attempt',
+            priority: WorkOrderPriority.urgent,
+            createdByLabel: 'Staff A',
+          ),
+        ),
+        throwsA(isA<WorkOrderValidationException>()),
+      );
+      expect(
+        (await source.readLocalWorkItem(original.localId))?.draft.routeId,
+        '300',
+      );
     });
 
     test(
@@ -279,6 +309,7 @@ void main() {
         expect(reconciled.localId, draft.localId);
         expect(reconciled.draft.incidentId, 'INC-1');
         expect(reconciled.draft.recommendationId, 'REC-1');
+        expect(reconciled.draft.routeId, '300');
         expect(await source.readConfirmedCache(), hasLength(1));
         expect(await source.readLocalWorkItems(), isEmpty);
       },
@@ -324,6 +355,7 @@ SqliteWorkOrderLocalDataSource _source(
 LocalWorkOrderDraft _draft() => LocalWorkOrderDraft(
   incidentId: 'INC-1',
   recommendationId: 'REC-1',
+  routeId: '300',
   vehicleId: 'B1023',
   taskType: 'Inspection',
   description: 'Inspect Route 300 breakdown.',
@@ -339,6 +371,7 @@ WorkOrderRecordDto _confirmed({int sequence = 1}) => WorkOrderRecordDto(
   workOrderId: 'WO-$sequence',
   incidentId: 'INC-1',
   recommendationId: 'REC-1',
+  routeId: '300',
   vehicleId: 'B1023',
   taskType: 'Inspection',
   description: 'Inspect Route 300 breakdown.',

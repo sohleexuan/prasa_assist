@@ -10,6 +10,7 @@ void main() {
       workOrderId: 'WO-1',
       incidentId: 'INC-1',
       recommendationId: 'REC-1',
+      routeId: '300',
       vehicleId: 'B1023',
       taskType: 'Vehicle inspection',
       description: 'Inspect breakdown on Route 300.',
@@ -28,6 +29,7 @@ void main() {
     );
 
     expect(workOrder.workOrderId, 'WO-1');
+    expect(workOrder.routeId, '300');
     expect(workOrder.vehicleId, 'B1023');
     expect(workOrder.priority.label, 'Urgent');
     expect(workOrder.status.label, 'Draft');
@@ -151,18 +153,20 @@ void main() {
     );
   });
 
-  test('copyWith explicitly clears every nullable field', () {
+  test('copyWith clears mutable nullable fields and preserves Route linkage',
+      () {
     final value = WorkOrder(
       workOrderId: 'WO-1',
       incidentId: 'INC-1',
       recommendationId: 'REC-1',
+      routeId: '300',
       vehicleId: 'B1023',
       taskType: 'Inspection',
       description: 'Inspect vehicle',
       priority: WorkOrderPriority.high,
       assignedTo: 'Staff B',
       scheduledStart: createdAt,
-      scheduledEnd: createdAt,
+      scheduledEnd: createdAt.add(const Duration(hours: 1)),
       status: WorkOrderStatus.open,
       notes: 'Note',
       createdByUserId: '11111111-1111-4111-8111-111111111111',
@@ -184,6 +188,7 @@ void main() {
     );
     expect(cleared.incidentId, isNull);
     expect(cleared.recommendationId, isNull);
+    expect(cleared.routeId, '300');
     expect(cleared.assignedTo, isNull);
     expect(cleared.scheduledStart, isNull);
     expect(cleared.scheduledEnd, isNull);
@@ -207,5 +212,54 @@ void main() {
     final second = first.copyWith();
     expect(second, first);
     expect(second.hashCode, first.hashCode);
+  });
+
+  test('requires scheduled end to be strictly after scheduled start', () {
+    WorkOrder build(DateTime end) => WorkOrder(
+      workOrderId: 'WO-SCHEDULE',
+      vehicleId: 'B1023',
+      taskType: 'Inspection',
+      description: 'Inspect vehicle',
+      priority: WorkOrderPriority.high,
+      scheduledStart: DateTime.utc(2026, 9, 2, 1),
+      scheduledEnd: end,
+      status: WorkOrderStatus.draft,
+      createdBy: 'Staff A',
+      createdAt: DateTime.utc(2026, 9, 2),
+      updatedAt: DateTime.utc(2026, 9, 2),
+    );
+
+    expect(
+      () => build(DateTime.utc(2026, 9, 2, 0, 59)),
+      throwsA(isA<WorkOrderValidationException>()),
+    );
+    expect(
+      () => build(DateTime.utc(2026, 9, 2, 1)),
+      throwsA(isA<WorkOrderValidationException>()),
+    );
+    expect(build(DateTime.utc(2026, 9, 2, 1, 1)), isA<WorkOrder>());
+  });
+
+  test('explicit hydration represents cancelled legacy equality safely', () {
+    final instant = DateTime.utc(2026, 9, 2, 1);
+
+    final hydrated = WorkOrder(
+      workOrderId: 'WO-LEGACY-EQUAL',
+      vehicleId: 'B1023',
+      taskType: 'Inspection',
+      description: 'Legacy equality row',
+      priority: WorkOrderPriority.high,
+      scheduledStart: instant,
+      scheduledEnd: instant,
+      status: WorkOrderStatus.cancelled,
+      createdBy: 'Staff A',
+      createdAt: instant,
+      updatedAt: instant,
+      cancelledAt: instant,
+      allowLegacyScheduleEquality: true,
+    );
+
+    expect(hydrated.hasLegacyScheduleEquality, isTrue);
+    expect(hydrated.status, WorkOrderStatus.cancelled);
   });
 }

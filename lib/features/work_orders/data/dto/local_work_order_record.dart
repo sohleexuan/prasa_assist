@@ -74,6 +74,7 @@ class LocalWorkOrderRecord {
       workOrderId: workOrderId!,
       incidentId: draft.incidentId,
       recommendationId: draft.recommendationId,
+      routeId: draft.routeId,
       vehicleId: draft.vehicleId,
       taskType: draft.taskType,
       description: draft.description,
@@ -90,6 +91,7 @@ class LocalWorkOrderRecord {
       completedAt: completedAt,
       cancelledAt: cancelledAt,
       remoteVersion: remoteVersion!,
+      allowLegacyScheduleEquality: draft.hasLegacyScheduleEquality,
     );
   }
 

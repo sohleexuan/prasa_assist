@@ -5,9 +5,13 @@ import 'package:prasa_assist/features/work_orders/repositories/work_order_data_e
 
 void main() {
   final now = DateTime(2026, 8, 27);
-  WorkOrder record(String id, {String description = 'Inspect vehicle'}) =>
+  WorkOrder record(String id,
+          {String description = 'Inspect vehicle', String? routeId = '300'}) =>
       WorkOrder(
         workOrderId: id,
+        incidentId: 'INC-1',
+        recommendationId: 'REC-1',
+        routeId: routeId,
         vehicleId: 'B1023',
         taskType: 'Inspection',
         description: description,
@@ -52,5 +56,17 @@ void main() {
     final records = await repository.readAll();
 
     expect(() => records.add(record('WO-2')), throwsUnsupportedError);
+  });
+
+  test('rejects linkage mutation at the repository boundary', () async {
+    final repository = InMemoryWorkOrderRepository(
+      initialWorkOrders: [record('WO-1')],
+    );
+
+    await expectLater(
+      repository.update(record('WO-1', routeId: '999')),
+      throwsA(isA<WorkOrderValidationException>()),
+    );
+    expect((await repository.read('WO-1'))?.routeId, '300');
   });
 }

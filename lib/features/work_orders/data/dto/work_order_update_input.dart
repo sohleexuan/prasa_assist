@@ -16,17 +16,7 @@ class WorkOrderUpdateInput {
        scheduledStart = scheduledStart?.toUtc(),
        scheduledEnd = scheduledEnd?.toUtc(),
        notes = _optional(notes) {
-    if ((this.scheduledStart == null) != (this.scheduledEnd == null)) {
-      throw const WorkOrderValidationException(
-        'Provide both scheduled start and scheduled end.',
-      );
-    }
-    if (this.scheduledStart != null &&
-        this.scheduledEnd!.isBefore(this.scheduledStart!)) {
-      throw const WorkOrderValidationException(
-        'Scheduled end cannot be earlier than scheduled start.',
-      );
-    }
+    validateWorkOrderSchedule(this.scheduledStart, this.scheduledEnd);
   }
 
   final String vehicleId;

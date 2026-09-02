@@ -72,6 +72,7 @@ void main() {
       final prefill = WorkOrderPrefill(
         incidentId: 'INC-1',
         recommendationId: 'REC-1',
+        routeId: '300',
         vehicleId: 'B1023',
         taskType: 'Vehicle inspection',
         description: 'Inspect the confirmed breakdown.',
@@ -97,11 +98,16 @@ void main() {
         'Safety inspection',
       );
       await _scrollToBottom(tester);
+      expect(find.text('Linked records'), findsOneWidget);
+      expect(find.text('INC-1'), findsOneWidget);
+      expect(find.text('REC-1'), findsOneWidget);
+      expect(find.text('300'), findsOneWidget);
       await tester.tap(find.byKey(const Key('saveWorkOrderButton')));
       await tester.pumpAndSettle();
 
       expect(controller.workOrders.single.recommendationId, 'REC-1');
       expect(controller.workOrders.single.incidentId, 'INC-1');
+      expect(controller.workOrders.single.routeId, '300');
       expect(controller.workOrders.single.taskType, 'Safety inspection');
       expect(controller.workOrders.single.priority, WorkOrderPriority.high);
       expect(
@@ -244,7 +250,26 @@ void main() {
 
     expect(find.text('Scheduled start: 2026-09-02 04:30 MYT'), findsOneWidget);
     expect(find.text('Scheduled end: 2026-09-02 05:30 MYT'), findsOneWidget);
+    final startButton = find.text('Scheduled start: 2026-09-02 04:30 MYT');
+    await tester.ensureVisible(startButton);
+    await tester.tap(startButton);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(DatePickerDialog),
+        matching: find.text('OK'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(TimePickerDialog),
+        matching: find.text('OK'),
+      ),
+    );
+    await tester.pumpAndSettle();
     await _scrollToBottom(tester);
+    expect(find.text('Save local draft'), findsOneWidget);
     await tester.tap(find.byKey(const Key('saveWorkOrderButton')));
     await tester.pumpAndSettle();
 
@@ -254,11 +279,90 @@ void main() {
     expect(saved.scheduledStart!.isUtc, isTrue);
     expect(saved.scheduledEnd!.isUtc, isTrue);
   });
+
+  testWidgets('form rejects a legacy schedule whose UTC instants are equal', (
+    tester,
+  ) async {
+    final instant = DateTime.utc(2026, 9, 2, 1);
+    final workOrder = WorkOrder(
+      workOrderId: 'WO-LEGACY-EQUAL',
+      vehicleId: 'B1023',
+      taskType: 'Inspection',
+      description: 'Legacy equality row',
+      priority: WorkOrderPriority.high,
+      scheduledStart: instant,
+      scheduledEnd: instant,
+      status: WorkOrderStatus.draft,
+      createdBy: 'Staff A',
+      createdAt: DateTime.utc(2026, 9, 2),
+      updatedAt: DateTime.utc(2026, 9, 2),
+      allowLegacyScheduleEquality: true,
+    );
+    final controller = WorkOrdersController(
+      InMemoryWorkOrderRepository(initialWorkOrders: [workOrder]),
+    );
+    addTearDown(controller.dispose);
+    await controller.load();
+
+    await tester.pumpWidget(
+      _TestHost(
+        child: WorkOrderFormPage(controller: controller, workOrder: workOrder),
+      ),
+    );
+    await _scrollToBottom(tester);
+    await tester.tap(find.byKey(const Key('saveWorkOrderButton')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Scheduled end must be later than scheduled start.'),
+      findsOneWidget,
+    );
+    expect(controller.findById(workOrder.workOrderId), workOrder);
+  });
+
+  testWidgets('confirmed remote edit uses Save changes wording', (
+    tester,
+  ) async {
+    final workOrder = WorkOrder(
+      workOrderId: 'WO-REMOTE-1',
+      incidentId: 'INC-LONG-123456789012345678901234567890',
+      recommendationId: 'REC-LONG-123456789012345678901234567890',
+      routeId: '300',
+      vehicleId: 'B1023',
+      taskType: 'Inspection',
+      description: 'Inspect the vehicle.',
+      priority: WorkOrderPriority.high,
+      status: WorkOrderStatus.draft,
+      createdByUserId: '11111111-1111-4111-8111-111111111111',
+      createdBy: 'Staff A',
+      createdAt: DateTime.utc(2026, 9, 2),
+      updatedAt: DateTime.utc(2026, 9, 2),
+      remoteVersion: 4,
+    );
+    final controller = WorkOrdersController(
+      InMemoryWorkOrderRepository(initialWorkOrders: [workOrder]),
+    );
+    addTearDown(controller.dispose);
+    await controller.load();
+
+    await tester.pumpWidget(
+      _TestHost(
+        child: WorkOrderFormPage(controller: controller, workOrder: workOrder),
+      ),
+    );
+    await _scrollToBottom(tester);
+
+    expect(find.text('Save changes'), findsOneWidget);
+    expect(find.text('Save local draft'), findsNothing);
+  });
 }
 
 Future<void> _scrollToBottom(WidgetTester tester) async {
-  await tester.drag(find.byType(ListView), const Offset(0, -700));
-  await tester.pumpAndSettle();
+  await tester.scrollUntilVisible(
+    find.byKey(const Key('saveWorkOrderButton')),
+    300,
+    scrollable: find.byType(Scrollable).first,
+  );
 }
 
 class _TestHost extends StatelessWidget {

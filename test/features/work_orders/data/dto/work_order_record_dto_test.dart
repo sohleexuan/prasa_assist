@@ -9,6 +9,7 @@ void main() {
     expect(dto.storageId, isNotEmpty);
     expect(dto.incidentId, 'INC-1');
     expect(dto.recommendationId, 'REC-1');
+    expect(dto.routeId, '300');
     expect(dto.createdAt.isUtc, isTrue);
     expect(dto.remoteVersion, 3);
     expect(WorkOrderRecordDto.fromMap(dto.toMap()).toMap(), dto.toMap());
@@ -21,6 +22,19 @@ void main() {
     );
     expect(() => _dto(version: 0), throwsA(isA<WorkOrderMappingException>()));
   });
+
+  test(
+    'legacy equality row maps for read without becoming a valid schedule',
+    () {
+      final map = _dto().toMap();
+      map['scheduled_end'] = map['scheduled_start'];
+
+      final legacy = WorkOrderRecordDto.fromMap(map);
+
+      expect(legacy.hasLegacyScheduleEquality, isTrue);
+      expect(legacy.scheduledEnd, legacy.scheduledStart);
+    },
+  );
 }
 
 WorkOrderRecordDto _dto({
@@ -31,6 +45,7 @@ WorkOrderRecordDto _dto({
   workOrderId: 'WO-1',
   incidentId: 'INC-1',
   recommendationId: 'REC-1',
+  routeId: '300',
   vehicleId: 'B1023',
   taskType: 'Inspection',
   description: 'Inspect Route 300 breakdown.',

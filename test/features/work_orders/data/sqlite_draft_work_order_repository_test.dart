@@ -34,6 +34,7 @@ void main() {
       final saved = await controller.createDraft(
         incidentId: 'INC-1',
         recommendationId: 'REC-1',
+        routeId: '300',
         vehicleId: 'B1023',
         taskType: 'Vehicle inspection',
         description: 'Inspect the confirmed breakdown.',
@@ -43,12 +44,14 @@ void main() {
 
       expect(saved.incidentId, 'INC-1');
       expect(saved.recommendationId, 'REC-1');
+      expect(saved.routeId, '300');
       final rows = await database.query(
         AppDatabaseMigrationV4.workOrderRecordsTable,
       );
       expect(rows, hasLength(1));
       expect(rows.single['incident_id'], 'INC-1');
       expect(rows.single['recommendation_id'], 'REC-1');
+      expect(rows.single['route_id'], '300');
     },
   );
 }

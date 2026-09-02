@@ -14,6 +14,7 @@ void main() {
       draft: LocalWorkOrderDraft(
         incidentId: 'INC-1',
         recommendationId: 'REC-1',
+        routeId: '300',
         vehicleId: 'B1023',
         taskType: 'Inspection',
         description: 'Inspect Route 300 breakdown.',
@@ -29,6 +30,7 @@ void main() {
     final restored = mapper.fromRow(mapper.toRow(record));
     expect(restored.draft.incidentId, 'INC-1');
     expect(restored.draft.recommendationId, 'REC-1');
+    expect(restored.draft.routeId, '300');
     expect(restored.localCreatedAt.isUtc, isTrue);
     expect(restored.syncState, LocalSyncState.localDraft);
   });

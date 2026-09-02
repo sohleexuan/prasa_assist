@@ -8,16 +8,19 @@ class WorkOrderPrefill {
     required this.priority,
     String? incidentId,
     String? recommendationId,
+    String? routeId,
     String? notes,
   }) : vehicleId = _required(vehicleId, 'vehicleId'),
        taskType = _required(taskType, 'taskType'),
        description = _required(description, 'description'),
        incidentId = _optional(incidentId),
        recommendationId = _optional(recommendationId),
+       routeId = _optional(routeId),
        notes = _optional(notes);
 
   final String? incidentId;
   final String? recommendationId;
+  final String? routeId;
   final String vehicleId;
   final String taskType;
   final String description;

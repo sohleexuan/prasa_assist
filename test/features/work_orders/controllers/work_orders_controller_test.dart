@@ -46,6 +46,7 @@ void main() {
       final created = await controller.createDraft(
         incidentId: ' INC-1 ',
         recommendationId: ' REC-1 ',
+        routeId: ' 300 ',
         vehicleId: 'B1023',
         taskType: 'Inspection',
         description: 'Inspect Route 300 breakdown.',
@@ -55,6 +56,7 @@ void main() {
 
       expect(created.incidentId, 'INC-1');
       expect(created.recommendationId, 'REC-1');
+      expect(created.routeId, '300');
       expect(created.createdByUserId, isNull);
     },
   );
@@ -412,6 +414,64 @@ void main() {
       expect(scheduledOperations.lastTransitionTarget, WorkOrderStatus.open);
     },
   );
+
+  test(
+    'controller rejects equal schedule and blocks legacy equality Open',
+    () async {
+      final controller = WorkOrdersController(
+        InMemoryWorkOrderRepository(initialWorkOrders: []),
+      );
+      addTearDown(controller.dispose);
+      final instant = DateTime.utc(2026, 9, 2, 1);
+
+      await expectLater(
+        controller.createDraft(
+          vehicleId: 'B1023',
+          taskType: 'Inspection',
+          description: 'Inspect vehicle',
+          priority: WorkOrderPriority.high,
+          scheduledStart: instant,
+          scheduledEnd: instant,
+        ),
+        throwsA(isA<WorkOrderValidationException>()),
+      );
+
+      final legacy = WorkOrder(
+        workOrderId: 'WO-LEGACY-EQUAL',
+        vehicleId: 'B1023',
+        taskType: 'Inspection',
+        description: 'Legacy equality row',
+        priority: WorkOrderPriority.high,
+        scheduledStart: instant,
+        scheduledEnd: instant,
+        status: WorkOrderStatus.draft,
+        createdBy: 'Staff A',
+        createdAt: DateTime.utc(2026, 9, 2),
+        updatedAt: DateTime.utc(2026, 9, 2),
+        allowLegacyScheduleEquality: true,
+      );
+      final legacyController = WorkOrdersController(
+        InMemoryWorkOrderRepository(initialWorkOrders: [legacy]),
+      );
+      addTearDown(legacyController.dispose);
+      await legacyController.load();
+
+      await expectLater(
+        legacyController.openWorkOrder(legacy.workOrderId),
+        throwsA(isA<WorkOrderValidationException>()),
+      );
+      expect(
+        legacyController.findById(legacy.workOrderId)?.status,
+        WorkOrderStatus.draft,
+      );
+
+      final cancelled = await legacyController.cancelWorkOrder(
+        legacy.workOrderId,
+      );
+      expect(cancelled.status, WorkOrderStatus.cancelled);
+      expect(cancelled.hasLegacyScheduleEquality, isTrue);
+    },
+  );
 }
 
 class _HybridOperationsFake implements WorkOrderHybridOperations {
@@ -480,6 +540,7 @@ class _HybridOperationsFake implements WorkOrderHybridOperations {
       workOrderId: 'WO-20260831-000001',
       incidentId: local.draft.incidentId,
       recommendationId: local.draft.recommendationId,
+      routeId: local.draft.routeId,
       vehicleId: local.draft.vehicleId,
       taskType: local.draft.taskType,
       description: local.draft.description,

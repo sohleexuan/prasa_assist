@@ -17,16 +17,19 @@ class WorkOrderRecordDto {
     required this.remoteVersion,
     String? incidentId,
     String? recommendationId,
+    String? routeId,
     String? assignedTo,
     DateTime? scheduledStart,
     DateTime? scheduledEnd,
     String? notes,
     DateTime? completedAt,
     DateTime? cancelledAt,
+    bool allowLegacyScheduleEquality = false,
   }) : storageId = _uuid(storageId, 'Remote storage ID'),
        workOrderId = _required(workOrderId, 'Work order ID'),
        incidentId = _optional(incidentId),
        recommendationId = _optional(recommendationId),
+       routeId = _optional(routeId),
        vehicleId = _required(vehicleId, 'Vehicle ID'),
        taskType = _required(taskType, 'Task type'),
        description = _required(description, 'Description'),
@@ -49,6 +52,7 @@ class WorkOrderRecordDto {
       workOrderId: this.workOrderId,
       incidentId: this.incidentId,
       recommendationId: this.recommendationId,
+      routeId: this.routeId,
       vehicleId: this.vehicleId,
       taskType: this.taskType,
       description: this.description,
@@ -65,6 +69,7 @@ class WorkOrderRecordDto {
       completedAt: this.completedAt,
       cancelledAt: this.cancelledAt,
       remoteVersion: remoteVersion,
+      allowLegacyScheduleEquality: allowLegacyScheduleEquality,
     );
   }
 
@@ -72,6 +77,7 @@ class WorkOrderRecordDto {
   final String workOrderId;
   final String? incidentId;
   final String? recommendationId;
+  final String? routeId;
   final String vehicleId;
   final String taskType;
   final String description;
@@ -89,6 +95,9 @@ class WorkOrderRecordDto {
   final DateTime? cancelledAt;
   final int remoteVersion;
 
+  bool get hasLegacyScheduleEquality =>
+      scheduledStart != null && scheduledEnd!.isAtSameMomentAs(scheduledStart!);
+
   factory WorkOrderRecordDto.fromMap(Map<String, dynamic> map) {
     try {
       return WorkOrderRecordDto(
@@ -96,6 +105,7 @@ class WorkOrderRecordDto {
         workOrderId: _mapString(map, 'work_order_id'),
         incidentId: _mapOptionalString(map, 'incident_id'),
         recommendationId: _mapOptionalString(map, 'recommendation_id'),
+        routeId: _mapOptionalString(map, 'route_id'),
         vehicleId: _mapString(map, 'vehicle_id'),
         taskType: _mapString(map, 'task_type'),
         description: _mapString(map, 'description'),
@@ -112,6 +122,7 @@ class WorkOrderRecordDto {
         completedAt: _mapOptionalDate(map, 'completed_at'),
         cancelledAt: _mapOptionalDate(map, 'cancelled_at'),
         remoteVersion: _mapInt(map, 'version'),
+        allowLegacyScheduleEquality: true,
       );
     } on WorkOrderDataException {
       rethrow;
@@ -128,6 +139,7 @@ class WorkOrderRecordDto {
     'work_order_id': workOrderId,
     'incident_id': incidentId,
     'recommendation_id': recommendationId,
+    'route_id': routeId,
     'vehicle_id': vehicleId,
     'task_type': taskType,
     'description': description,

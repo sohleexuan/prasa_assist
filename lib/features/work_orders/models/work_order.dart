@@ -18,6 +18,7 @@ class WorkOrder {
     required DateTime updatedAt,
     String? incidentId,
     String? recommendationId,
+    String? routeId,
     String? assignedTo,
     DateTime? scheduledStart,
     DateTime? scheduledEnd,
@@ -25,9 +26,11 @@ class WorkOrder {
     DateTime? completedAt,
     DateTime? cancelledAt,
     this.remoteVersion,
+    bool allowLegacyScheduleEquality = false,
   }) : workOrderId = _required(workOrderId, 'Work order ID'),
        incidentId = _optional(incidentId),
        recommendationId = _optional(recommendationId),
+       routeId = _optional(routeId),
        vehicleId = _required(vehicleId, 'Vehicle ID'),
        taskType = _required(taskType, 'Task type'),
        description = _required(description, 'Description'),
@@ -41,7 +44,7 @@ class WorkOrder {
        updatedAt = updatedAt.toUtc(),
        completedAt = completedAt?.toUtc(),
        cancelledAt = cancelledAt?.toUtc() {
-    _validate();
+    _validate(allowLegacyScheduleEquality: allowLegacyScheduleEquality);
   }
 
   static const Object _unset = Object();
@@ -49,6 +52,7 @@ class WorkOrder {
   final String workOrderId;
   final String? incidentId;
   final String? recommendationId;
+  final String? routeId;
   final String vehicleId;
   final String taskType;
   final String description;
@@ -67,6 +71,8 @@ class WorkOrder {
   final int? remoteVersion;
 
   bool get isTerminal => status.isTerminal;
+  bool get hasLegacyScheduleEquality =>
+      scheduledStart != null && scheduledEnd!.isAtSameMomentAs(scheduledStart!);
 
   WorkOrder copyWith({
     String? workOrderId,
@@ -96,6 +102,7 @@ class WorkOrder {
         recommendationId,
         this.recommendationId,
       ),
+      routeId: routeId,
       vehicleId: vehicleId ?? this.vehicleId,
       taskType: taskType ?? this.taskType,
       description: description ?? this.description,
@@ -115,17 +122,12 @@ class WorkOrder {
     );
   }
 
-  void _validate() {
-    if ((scheduledStart == null) != (scheduledEnd == null)) {
-      throw const WorkOrderValidationException(
-        'Provide both scheduled start and scheduled end.',
-      );
-    }
-    if (scheduledStart != null && scheduledEnd!.isBefore(scheduledStart!)) {
-      throw const WorkOrderValidationException(
-        'Scheduled end cannot be earlier than scheduled start.',
-      );
-    }
+  void _validate({required bool allowLegacyScheduleEquality}) {
+    validateWorkOrderSchedule(
+      scheduledStart,
+      scheduledEnd,
+      allowLegacyScheduleEquality: allowLegacyScheduleEquality,
+    );
     if (updatedAt.isBefore(createdAt)) {
       throw const WorkOrderValidationException(
         'Updated time cannot be earlier than created time.',
@@ -221,6 +223,7 @@ class WorkOrder {
           workOrderId == other.workOrderId &&
           incidentId == other.incidentId &&
           recommendationId == other.recommendationId &&
+          routeId == other.routeId &&
           vehicleId == other.vehicleId &&
           taskType == other.taskType &&
           description == other.description &&
@@ -243,6 +246,7 @@ class WorkOrder {
     workOrderId,
     incidentId,
     recommendationId,
+    routeId,
     vehicleId,
     taskType,
     description,
@@ -260,6 +264,26 @@ class WorkOrder {
     cancelledAt,
     remoteVersion,
   );
+}
+
+void validateWorkOrderSchedule(
+  DateTime? scheduledStart,
+  DateTime? scheduledEnd, {
+  bool allowLegacyScheduleEquality = false,
+}) {
+  if ((scheduledStart == null) != (scheduledEnd == null)) {
+    throw const WorkOrderValidationException(
+      'Provide both scheduled start and scheduled end.',
+    );
+  }
+  if (scheduledStart == null) return;
+  final endIsBefore = scheduledEnd!.isBefore(scheduledStart);
+  final endIsEqual = scheduledEnd.isAtSameMomentAs(scheduledStart);
+  if (endIsBefore || (endIsEqual && !allowLegacyScheduleEquality)) {
+    throw const WorkOrderValidationException(
+      'Scheduled end must be later than scheduled start.',
+    );
+  }
 }
 
 extension WorkOrderPriorityLabel on WorkOrderPriority {

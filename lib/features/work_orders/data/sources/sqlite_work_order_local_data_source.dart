@@ -166,6 +166,7 @@ class SqliteWorkOrderLocalDataSource implements WorkOrderLocalDataSource {
         LocalSyncState.conflict,
       };
       _requireState(existing, allowed);
+      _requireImmutableLinkage(existing.draft, draft);
       final updated = LocalWorkOrderRecord(
         localId: existing.localId,
         ownerUserId: _ownerUserId,
@@ -425,6 +426,19 @@ class SqliteWorkOrderLocalDataSource implements WorkOrderLocalDataSource {
     if (!allowed.contains(record.syncState)) {
       throw const WorkOrderValidationException(
         'The current local state does not allow that action.',
+      );
+    }
+  }
+
+  void _requireImmutableLinkage(
+    LocalWorkOrderDraft existing,
+    LocalWorkOrderDraft updated,
+  ) {
+    if (existing.incidentId != updated.incidentId ||
+        existing.recommendationId != updated.recommendationId ||
+        existing.routeId != updated.routeId) {
+      throw const WorkOrderValidationException(
+        'Linked records cannot be changed after draft creation.',
       );
     }
   }

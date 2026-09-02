@@ -7,21 +7,21 @@ import 'package:prasa_assist/core/database/migrations/app_database_migration_v5.
 import '../../support/sqlite_test_database.dart';
 
 void main() {
-  test('fresh database reaches v6 with recommendation relationship', () async {
+  test('fresh database includes recommendation relationship', () async {
     final database = createInMemoryTestDatabase();
     addTearDown(database.close);
     await database.ensureOpen();
 
     expect(
       (await database.rawQuery('PRAGMA user_version')).single['user_version'],
-      6,
+      7,
     );
     expect(
       (await database.query(
         AppDatabaseSchema.migrationTable,
         orderBy: 'version ASC',
       )).map((row) => row['version']),
-      [1, 2, 3, 4, 5, 6],
+      [1, 2, 3, 4, 5, 6, 7],
     );
     await database.insert(
       AppDatabaseMigrationV5.recommendationRecordsTable,
@@ -40,7 +40,7 @@ void main() {
     );
   });
 
-  test('actual v4 database upgrades to v6 and preserves v4 data', () async {
+  test('actual v4 database upgrades and preserves v4 data', () async {
     final directory = await Directory.systemTemp.createTemp('prasa-v5-');
     addTearDown(() => directory.delete(recursive: true));
     final path = '${directory.path}${Platform.pathSeparator}upgrade.db';
@@ -55,7 +55,7 @@ void main() {
     expect((await upgraded.query('preserved_v4')).single['value'], 'kept');
     expect(
       (await upgraded.rawQuery('PRAGMA user_version')).single['user_version'],
-      6,
+      7,
     );
   });
 }

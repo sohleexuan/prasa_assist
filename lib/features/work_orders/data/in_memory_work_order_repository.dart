@@ -41,6 +41,14 @@ class InMemoryWorkOrderRepository implements WorkOrderRepository {
     if (index == -1) {
       throw const WorkOrderNotFoundException('Work order not found.');
     }
+    final existing = _workOrders[index];
+    if (existing.incidentId != workOrder.incidentId ||
+        existing.recommendationId != workOrder.recommendationId ||
+        existing.routeId != workOrder.routeId) {
+      throw const WorkOrderValidationException(
+        'Linked records cannot be changed after work-order creation.',
+      );
+    }
     _workOrders[index] = workOrder;
     return workOrder;
   }

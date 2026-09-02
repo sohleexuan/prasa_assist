@@ -24,6 +24,7 @@ void main() {
         expect(payload, isNot(contains('created_by_label')));
         expect(payload['incident_id'], 'INC-B1023-ROUTE-300');
         expect(payload['recommendation_id'], 'REC-INSPECT-B1023');
+        expect(payload['route_id'], '300');
         expect(
           payload['notes'],
           'Advisory note supplied by the accepted recommendation.',
@@ -136,6 +137,7 @@ void main() {
 LocalWorkOrderDraft _draft() => LocalWorkOrderDraft(
   incidentId: 'INC-B1023-ROUTE-300',
   recommendationId: 'REC-INSPECT-B1023',
+  routeId: '300',
   vehicleId: 'B1023',
   taskType: 'Inspection',
   description: 'Inspect Bus B1023 after its Route 300 breakdown.',
@@ -149,6 +151,7 @@ Map<String, dynamic> _row({String status = 'draft', int version = 1}) => {
   'work_order_id': 'WO-20260830-000001',
   'incident_id': 'INC-B1023-ROUTE-300',
   'recommendation_id': 'REC-INSPECT-B1023',
+  'route_id': '300',
   'vehicle_id': 'B1023',
   'task_type': 'Inspection',
   'description': 'Inspect Bus B1023 after its Route 300 breakdown.',

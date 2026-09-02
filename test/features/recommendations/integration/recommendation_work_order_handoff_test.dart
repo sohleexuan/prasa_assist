@@ -6,6 +6,7 @@ import 'package:prasa_assist/features/recommendations/domain/recommendation_anal
 import 'package:prasa_assist/features/recommendations/domain/recommendation_confidence.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation_evidence.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation_status.dart';
+import 'package:prasa_assist/features/recommendations/services/recommendation_deployment_prefill_factory.dart';
 import 'package:prasa_assist/features/recommendations/services/recommendation_work_order_prefill_factory.dart';
 import 'package:prasa_assist/features/work_orders/models/work_order.dart';
 
@@ -16,7 +17,10 @@ void main() {
       incidentId: 'INC-1',
       vehicleId: 'B1023',
       routeId: '300',
-      actions: [InspectOrRepairVehicleAction(vehicleId: 'B1023')],
+      actions: [
+        InspectOrRepairVehicleAction(vehicleId: 'B1023'),
+        DeployReplacementBusesAction(routeId: '300', busCount: 2),
+      ],
       evidence: [
         RecommendationEvidence(
           ruleId: 'breakdown',
@@ -60,7 +64,9 @@ void main() {
           recommendationId: 'REC-1',
           modelIdentifier: 'gemini-2.5-flash',
           schemaVersion: 1,
-          summary: 'Inspect B1023 before returning it to service.',
+          summary:
+              'Inspect B1023 before returning it to service and deploy two '
+              'replacement buses.',
           rationale: ['The stored breakdown evidence supports inspection.'],
           limitations: ['Staff must verify the current vehicle condition.'],
           staffReviewChecklist: ['Review the stored evidence.'],
@@ -71,16 +77,24 @@ void main() {
     expect(prefill.vehicleId, 'B1023');
     expect(prefill.incidentId, 'INC-1');
     expect(prefill.recommendationId, 'REC-1');
+    expect(prefill.routeId, '300');
     expect(prefill.taskType, 'Vehicle inspection');
     expect(
       prefill.description,
       'Inspect B1023 following the confirmed breakdown recommendation.',
     );
     expect(prefill.priority, WorkOrderPriority.high);
-    expect(
-      prefill.notes,
-      'AI-generated summary (review before saving): '
-      'Inspect B1023 before returning it to service.',
+    expect(prefill.notes, contains('Inspect or repair B1023'));
+    expect(prefill.notes, isNot(contains('replacement')));
+    expect(prefill.notes, isNot(contains('deploy')));
+
+    final deployment = const RecommendationDeploymentPrefillFactory().create(
+      RecommendationRecordDto(recommendation: accepted),
     );
+    expect(deployment.incidentId, 'INC-1');
+    expect(deployment.recommendationId, 'REC-1');
+    expect(deployment.routeId, '300');
+    expect(deployment.suggestedVehicleCount, 2);
+    expect(deployment.suggestedPurpose, contains('replacement buses'));
   });
 }

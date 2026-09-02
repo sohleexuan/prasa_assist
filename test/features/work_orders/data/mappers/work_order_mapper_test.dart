@@ -11,6 +11,7 @@ void main() {
       workOrderId: 'WO-1',
       incidentId: 'INC-1',
       recommendationId: 'REC-1',
+      routeId: '300',
       vehicleId: 'B1023',
       taskType: 'Inspection',
       description: 'Inspect Route 300 breakdown.',
@@ -25,6 +26,7 @@ void main() {
     final domain = const WorkOrderMapper().toDomain(dto);
     expect(domain.incidentId, 'INC-1');
     expect(domain.recommendationId, 'REC-1');
+    expect(domain.routeId, '300');
     expect(domain.remoteVersion, 4);
     expect(domain.createdByUserId, dto.createdByUserId);
   });
