@@ -8,7 +8,7 @@ void main() {
   setUpAll(() {
     migration = File(
       'supabase/migrations/20260903100000_staff_directory_assignment.sql',
-    ).readAsStringSync();
+    ).readAsStringSync().replaceAll('\r\n', '\n').replaceAll('\r', '\n');
   });
 
   test('starts with aggregate and catalog-only preflight checks', () {
