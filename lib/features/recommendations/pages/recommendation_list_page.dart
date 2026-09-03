@@ -7,6 +7,7 @@ import '../../../shared/widgets/app_loading_indicator.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
 import '../controllers/recommendation_controller.dart';
 import '../domain/recommendation_status.dart';
+import '../widgets/recommendation_data_notice.dart';
 import 'recommendation_detail_page.dart';
 
 class RecommendationListPage extends StatefulWidget {
@@ -73,12 +74,18 @@ class _RecommendationListPageState extends State<RecommendationListPage> {
         message: 'Deterministic recommendations awaiting staff review will appear here.',
       );
     }
+    final provenance = widget.controller.readProvenance;
+    final provenanceOffset = provenance == null ? 0 : 1;
     return ListView.separated(
       padding: const EdgeInsets.all(AppSpacing.md),
-      itemCount: widget.controller.records.length,
+      itemCount: widget.controller.records.length + provenanceOffset,
       separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
       itemBuilder: (context, index) {
-        final item = widget.controller.records[index].recommendation;
+        if (provenance != null && index == 0) {
+          return RecommendationDataNotice(provenance: provenance);
+        }
+        final item =
+            widget.controller.records[index - provenanceOffset].recommendation;
         return Card(
           child: ListTile(
             title: Text(

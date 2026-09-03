@@ -5,6 +5,7 @@ import '../../../../core/database/migrations/app_database_migration_v5.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../dto/recommendation_record_dto.dart';
+import '../../repositories/recommendation_data_exception.dart';
 import 'recommendation_local_data_source.dart';
 
 class SqliteRecommendationLocalDataSource
@@ -44,6 +45,28 @@ class SqliteRecommendationLocalDataSource
         .where((record) => record.recommendation.id == id.trim())
         .toList(growable: false);
     return records.isEmpty ? null : records.single;
+  }
+
+  @override
+  Future<DateTime?> readOldestRetrievedAtUtc() async {
+    final rows = await _database.rawQuery(
+      '''
+      SELECT MIN(retrieved_at_utc) AS retrieved_at_utc
+      FROM ${AppDatabaseMigrationV5.recommendationRecordsTable}
+      WHERE owner_user_id = ?
+    ''',
+      [_ownerUserId],
+    );
+    final value = rows.single['retrieved_at_utc'] as String?;
+    if (value == null) return null;
+    try {
+      return DateTime.parse(value).toUtc();
+    } on FormatException catch (error) {
+      throw RecommendationMappingException(
+        'Cached recommendation retrieval time is invalid.',
+        cause: error,
+      );
+    }
   }
 
   @override

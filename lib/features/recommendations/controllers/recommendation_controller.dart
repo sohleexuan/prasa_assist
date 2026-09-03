@@ -4,7 +4,9 @@ import '../../../shared/staff/staff_directory_exception.dart';
 import '../../../shared/staff/staff_directory_repository.dart';
 import '../../../shared/staff/staff_profile.dart';
 import '../data/dto/recommendation_record_dto.dart';
+import '../models/recommendation_read_result.dart';
 import '../repositories/recommendation_data_exception.dart';
+import '../repositories/recommendation_hybrid_operations.dart';
 import '../repositories/recommendation_repository.dart';
 
 class RecommendationController extends ChangeNotifier {
@@ -17,10 +19,12 @@ class RecommendationController extends ChangeNotifier {
   final Map<String, String> _analysisErrors = {};
   String? _error;
   StaffDirectorySnapshot? _staffDirectory;
+  RecommendationReadProvenance? _readProvenance;
 
   List<RecommendationRecordDto> get records => List.unmodifiable(_records);
   bool get isLoading => _loading;
   String? get errorMessage => _error;
+  RecommendationReadProvenance? get readProvenance => _readProvenance;
   String? analysisErrorMessage(String id) => _analysisErrors[id];
   bool isBusy(String id) => _busy.contains(id);
   RecommendationRecordDto? find(String id) {
@@ -37,10 +41,20 @@ class RecommendationController extends ChangeNotifier {
   Future<void> load() async {
     _loading = true;
     _error = null;
+    _readProvenance = null;
     notifyListeners();
     try {
       await _loadStaffDirectory();
-      _records = await _repository.readAll();
+      final hybrid = _repository is RecommendationHybridOperations
+          ? _repository as RecommendationHybridOperations
+          : null;
+      if (hybrid == null) {
+        _records = await _repository.readAll();
+      } else {
+        final result = await hybrid.readAllWithProvenance();
+        _records = result.data;
+        _readProvenance = result.provenance;
+      }
     } on RecommendationDataException catch (error) {
       _error = error.safeMessage;
     } finally {

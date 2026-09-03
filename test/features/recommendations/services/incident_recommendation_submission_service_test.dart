@@ -11,32 +11,29 @@ import 'package:prasa_assist/features/recommendations/domain/recommendation_rule
 import 'package:prasa_assist/features/recommendations/domain/verified_incident_recommendation_input.dart';
 
 void main() {
-  test(
-    'persists the deterministic B1023 peak recommendation without provider analysis',
-    () async {
-      final repository = _Repository();
-      final service = _service(repository);
-      final result = await service.submit(
-        input: _peakBreakdown('INC-B1023-300'),
-        ownerUserId: _ownerUserId,
-        recommendationId: _recommendationId,
-        createdAt: DateTime.utc(2026, 8, 30, 1),
-      );
+  test('persists the deterministic B1023 peak recommendation without provider analysis', () async {
+    final repository = _Repository();
+    final service = _service(repository);
+    final result = await service.submit(
+      input: _peakBreakdown('INC-B1023-300'),
+      ownerUserId: _ownerUserId,
+      recommendationId: _recommendationId,
+      createdAt: DateTime.utc(2026, 8, 30, 1),
+    );
 
-      expect(result?.recommendation.status.name, 'pendingReview');
-      expect(result?.recommendation.score, 85);
-      expect(result?.recommendation.actions, hasLength(2));
-      expect(
-        result?.recommendation.actions
-            .whereType<DeployReplacementBusesAction>()
-            .single
-            .busCount,
-        2,
-      );
-      expect(repository.createCalls, 1);
-      expect(repository.analysisCalls, 0);
-    },
-  );
+    expect(result?.recommendation.status.name, 'pendingReview');
+    expect(result?.recommendation.score, 85);
+    expect(result?.recommendation.actions, hasLength(2));
+    expect(
+      result?.recommendation.actions
+          .whereType<DeployReplacementBusesAction>()
+          .single
+          .busCount,
+      2,
+    );
+    expect(repository.createCalls, 1);
+    expect(repository.analysisCalls, 0);
+  });
 
   test('reuses the same caller UUID on retry without another create', () async {
     final repository = _Repository();

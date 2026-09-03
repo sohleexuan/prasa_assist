@@ -8,10 +8,51 @@ import 'package:prasa_assist/features/recommendations/domain/recommendation_anal
 import 'package:prasa_assist/features/recommendations/domain/recommendation_confidence.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation_evidence.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation_status.dart';
+import 'package:prasa_assist/features/recommendations/models/recommendation_read_result.dart';
 import 'package:prasa_assist/features/recommendations/repositories/hybrid_recommendation_repository.dart';
 import 'package:prasa_assist/features/recommendations/repositories/recommendation_data_exception.dart';
 
 void main() {
+  test('live reads expose Supabase provenance and retrieval time', () async {
+    final local = _Local();
+    final repository = HybridRecommendationRepository(
+      remote: _Remote(_record()),
+      local: local,
+      clock: () => DateTime.utc(2026, 9, 4, 1, 30),
+    );
+
+    final result = await repository.readAllWithProvenance();
+
+    expect(result.data, hasLength(1));
+    expect(result.provenance.source, RecommendationReadSource.liveSupabase);
+    expect(result.provenance.retrievedAtUtc, DateTime.utc(2026, 9, 4, 1, 30));
+    expect(local.lastReplacementRetrievedAt, result.provenance.retrievedAtUtc);
+    expect(result.provenance.warningMessage, isNull);
+  });
+
+  test(
+    'offline reads expose cached SQLite provenance and cache time',
+    () async {
+      final cachedAt = DateTime.utc(2026, 9, 3, 23, 45);
+      final remote = _Remote(_record())..failFetch = true;
+      final local = _Local()
+        ..records = [_record()]
+        ..oldestRetrievedAtUtc = cachedAt;
+      final repository = HybridRecommendationRepository(
+        remote: remote,
+        local: local,
+        clock: () => DateTime.utc(2026, 9, 4, 2),
+      );
+
+      final result = await repository.readAllWithProvenance();
+
+      expect(result.data, hasLength(1));
+      expect(result.provenance.source, RecommendationReadSource.cachedSqlite);
+      expect(result.provenance.retrievedAtUtc, cachedAt);
+      expect(result.provenance.warningMessage, contains('not live'));
+    },
+  );
+
   test('analysis failure allows one retry then immutable success', () async {
     final remote = _Remote(_record());
     final repository = HybridRecommendationRepository(
@@ -82,11 +123,18 @@ class _Remote implements RecommendationRemoteDataSource {
   RecommendationRecordDto record;
   bool failAnalysis = false;
   bool failCreate = false;
+  bool failFetch = false;
   int analysisCalls = 0;
   int createCalls = 0;
   int? lastExpectedVersion;
   @override
-  Future<List<RecommendationRecordDto>> fetchAll() async => [record];
+  Future<List<RecommendationRecordDto>> fetchAll() async {
+    if (failFetch) {
+      throw const RecommendationOfflineException('Recommendation unavailable.');
+    }
+    return [record];
+  }
+
   @override
   Future<RecommendationRecordDto?> fetchById(String id) async => record;
 
@@ -139,6 +187,12 @@ class _Remote implements RecommendationRemoteDataSource {
 
 class _Local implements RecommendationLocalDataSource {
   List<RecommendationRecordDto> records = [];
+  DateTime? oldestRetrievedAtUtc;
+  DateTime? lastReplacementRetrievedAt;
+
+  @override
+  Future<DateTime?> readOldestRetrievedAtUtc() async => oldestRetrievedAtUtc;
+
   @override
   Future<List<RecommendationRecordDto>> readAll() async => records;
   @override
@@ -149,6 +203,8 @@ class _Local implements RecommendationLocalDataSource {
     Iterable<RecommendationRecordDto> records, {
     required DateTime retrievedAt,
   }) async {
+    lastReplacementRetrievedAt = retrievedAt;
+    oldestRetrievedAtUtc ??= retrievedAt;
     for (final record in records) {
       this.records.removeWhere(
         (item) => item.recommendation.id == record.recommendation.id,

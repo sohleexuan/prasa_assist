@@ -15,6 +15,7 @@ import '../domain/recommendation_status.dart';
 import '../services/recommendation_work_order_prefill_factory.dart';
 import '../services/recommendation_deployment_prefill_factory.dart';
 import '../widgets/recommendation_analysis_panel.dart';
+import '../widgets/recommendation_data_notice.dart';
 
 /// Lets the coordinator open Module 3's editable create form. The callback is
 /// advisory only; Module 4 does not navigate or persist a deployment.
@@ -93,6 +94,10 @@ class _RecommendationDetailPageState extends State<RecommendationDetailPage> {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
+          if (widget.controller.readProvenance case final provenance?) ...[
+            RecommendationDataNotice(provenance: provenance),
+            const SizedBox(height: AppSpacing.md),
+          ],
           Text(
             'AI recommends. Staff decides.',
             style: Theme.of(context).textTheme.titleLarge,

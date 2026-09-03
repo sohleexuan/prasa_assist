@@ -1,10 +1,13 @@
 import '../data/dto/recommendation_record_dto.dart';
 import '../data/sources/recommendation_local_data_source.dart';
 import '../data/sources/recommendation_remote_data_source.dart';
+import '../models/recommendation_read_result.dart';
 import 'recommendation_data_exception.dart';
+import 'recommendation_hybrid_operations.dart';
 import 'recommendation_repository.dart';
 
-class HybridRecommendationRepository implements RecommendationRepository {
+class HybridRecommendationRepository
+    implements RecommendationRepository, RecommendationHybridOperations {
   factory HybridRecommendationRepository({
     required RecommendationRemoteDataSource remote,
     required RecommendationLocalDataSource local,
@@ -18,15 +21,41 @@ class HybridRecommendationRepository implements RecommendationRepository {
   final DateTime Function() _clock;
 
   @override
-  Future<List<RecommendationRecordDto>> readAll() async {
+  Future<List<RecommendationRecordDto>> readAll() async =>
+      (await readAllWithProvenance()).data;
+
+  @override
+  Future<RecommendationReadResult<List<RecommendationRecordDto>>>
+  readAllWithProvenance() async {
     try {
       final records = await _remote.fetchAll();
-      await _local.replaceAll(records, retrievedAt: _clock().toUtc());
-      return records;
+      final retrievedAtUtc = _clock().toUtc();
+      await _local.replaceAll(records, retrievedAt: retrievedAtUtc);
+      return RecommendationReadResult(
+        data: records,
+        provenance: RecommendationReadProvenance(
+          source: RecommendationReadSource.liveSupabase,
+          retrievedAtUtc: retrievedAtUtc,
+        ),
+      );
     } on RecommendationOfflineException {
       final cached = await _local.readAll();
       if (cached.isEmpty) rethrow;
-      return cached;
+      final retrievedAtUtc = await _local.readOldestRetrievedAtUtc();
+      if (retrievedAtUtc == null) {
+        throw const RecommendationMappingException(
+          'Cached recommendation retrieval time is unavailable.',
+        );
+      }
+      return RecommendationReadResult(
+        data: cached,
+        provenance: RecommendationReadProvenance(
+          source: RecommendationReadSource.cachedSqlite,
+          retrievedAtUtc: retrievedAtUtc,
+          warningMessage:
+              'Showing cached/offline SQLite recommendation data — not live.',
+        ),
+      );
     }
   }
 

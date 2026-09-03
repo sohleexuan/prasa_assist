@@ -29,14 +29,19 @@ void main() {
       );
       await sourceA.replaceAll([
         _record(ownerA),
-      ], retrievedAt: DateTime(2026, 8, 29, 10));
+      ], retrievedAt: DateTime.utc(2026, 8, 29, 10));
 
       final cached = (await sourceA.readAll()).single;
       expect(cached.recommendation.remoteVersion, 3);
       expect(cached.recommendation.createdAt.isUtc, isTrue);
       expect(cached.analysis?.generatedAt.isUtc, isTrue);
       expect(cached.analysis?.summary, 'Review the confirmed breakdown.');
+      expect(
+        await sourceA.readOldestRetrievedAtUtc(),
+        DateTime.utc(2026, 8, 29, 10),
+      );
       expect(await sourceB.readAll(), isEmpty);
+      expect(await sourceB.readOldestRetrievedAtUtc(), isNull);
     },
   );
 }

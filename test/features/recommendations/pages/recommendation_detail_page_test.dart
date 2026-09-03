@@ -12,8 +12,10 @@ import 'package:prasa_assist/features/recommendations/domain/recommendation_anal
 import 'package:prasa_assist/features/recommendations/domain/recommendation_confidence.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation_evidence.dart';
 import 'package:prasa_assist/features/recommendations/domain/recommendation_status.dart';
+import 'package:prasa_assist/features/recommendations/models/recommendation_read_result.dart';
 import 'package:prasa_assist/features/recommendations/pages/recommendation_detail_page.dart';
 import 'package:prasa_assist/features/recommendations/pages/recommendation_list_page.dart';
+import 'package:prasa_assist/features/recommendations/repositories/recommendation_hybrid_operations.dart';
 import 'package:prasa_assist/features/recommendations/repositories/recommendation_data_exception.dart';
 import 'package:prasa_assist/features/recommendations/repositories/recommendation_repository.dart';
 import 'package:prasa_assist/features/recommendations/widgets/recommendation_analysis_panel.dart';
@@ -23,6 +25,42 @@ import 'package:prasa_assist/shared/staff/staff_directory_repository.dart';
 import 'package:prasa_assist/shared/staff/staff_profile.dart';
 
 void main() {
+  testWidgets('detail identifies cached recommendation data as not live', (
+    tester,
+  ) async {
+    final controller = RecommendationController(
+      _ProvenanceRepository(
+        _acceptedRecord(),
+        RecommendationReadProvenance(
+          source: RecommendationReadSource.cachedSqlite,
+          retrievedAtUtc: DateTime.utc(2026, 9, 4, 2),
+          warningMessage: 'Cached recommendation data is not live.',
+        ),
+      ),
+    );
+    addTearDown(controller.dispose);
+    await controller.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: RecommendationDetailPage(
+          recommendationId: 'rec-1',
+          controller: controller,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining(
+        'Cached/offline SQLite recommendation data — not live',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('2026-09-04 10:00 MYT'), findsOneWidget);
+  });
+
   testWidgets('analysis panel uses provider-neutral staff-decision wording', (
     tester,
   ) async {
@@ -441,6 +479,18 @@ class _FixedRepository implements RecommendationRepository {
     String? note,
     required int expectedVersion,
   }) async => record;
+}
+
+class _ProvenanceRepository extends _FixedRepository
+    implements RecommendationHybridOperations {
+  _ProvenanceRepository(super.record, this.provenance);
+
+  final RecommendationReadProvenance provenance;
+
+  @override
+  Future<RecommendationReadResult<List<RecommendationRecordDto>>>
+  readAllWithProvenance() async =>
+      RecommendationReadResult(data: [record], provenance: provenance);
 }
 
 class _RecommendationStaffDirectoryFake implements StaffDirectoryRepository {

@@ -94,7 +94,7 @@ class _PrasaAssistHomePageState extends State<PrasaAssistHomePage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Development foundation',
+                            'Integrated staff prototype',
                             style: Theme.of(context).textTheme.titleSmall
                                 ?.copyWith(
                                   color: AppColors.onDevelopmentContainer,
@@ -103,8 +103,9 @@ class _PrasaAssistHomePageState extends State<PrasaAssistHomePage> {
                           ),
                           const SizedBox(height: AppSpacing.xxs),
                           Text(
-                            'Not a live operations system. Module workflows '
-                            'will be connected during coordinated integration.',
+                            'Not a live operations control system. Module '
+                            'workflows are connected for staff-reviewed '
+                            'decision support.',
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
                                   color: AppColors.onDevelopmentContainer,
@@ -181,7 +182,7 @@ class _PrasaAssistHomePageState extends State<PrasaAssistHomePage> {
                     ),
                   ),
                   const AppStatusChip(
-                    label: 'Foundation mode',
+                    label: 'Integrated',
                     tone: AppStatusTone.information,
                   ),
                 ],

@@ -37,24 +37,31 @@ void main() {
     'AI Recommendations',
   ];
 
-  testWidgets('home page renders foundation messaging and four modules', (
-    tester,
-  ) async {
-    await _pumpAuthenticatedApp(tester);
+  testWidgets(
+    'home page renders integrated prototype messaging and four modules',
+    (tester) async {
+      await _pumpAuthenticatedApp(tester);
 
-    expect(find.text('Development foundation'), findsOneWidget);
-    expect(find.text('AI recommends. Staff decides.'), findsOneWidget);
-
-    for (final moduleName in moduleNames) {
-      final moduleEntry = find.text(moduleName);
-      await tester.scrollUntilVisible(
-        moduleEntry,
-        160,
-        scrollable: find.byType(Scrollable).first,
+      expect(find.text('Integrated staff prototype'), findsOneWidget);
+      expect(find.text('Integrated'), findsOneWidget);
+      expect(
+        find.textContaining('Module workflows are connected'),
+        findsOneWidget,
       );
-      expect(moduleEntry, findsOneWidget);
-    }
-  });
+      expect(find.textContaining('will be connected'), findsNothing);
+      expect(find.text('AI recommends. Staff decides.'), findsOneWidget);
+
+      for (final moduleName in moduleNames) {
+        final moduleEntry = find.text(moduleName);
+        await tester.scrollUntilVisible(
+          moduleEntry,
+          160,
+          scrollable: find.byType(Scrollable).first,
+        );
+        expect(moduleEntry, findsOneWidget);
+      }
+    },
+  );
 
   testWidgets('navigates from Incident Management to the Module 1 workflow', (
     tester,
