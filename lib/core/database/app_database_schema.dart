@@ -6,10 +6,11 @@ import 'migrations/app_database_migration_v4.dart';
 import 'migrations/app_database_migration_v5.dart';
 import 'migrations/app_database_migration_v6.dart';
 import 'migrations/app_database_migration_v7.dart';
+import 'migrations/app_database_migration_v8.dart';
 
 abstract final class AppDatabaseSchema {
   static const String filename = 'prasa_assist.db';
-  static const int version = 7;
+  static const int version = 8;
   static const String migrationTable = 'local_schema_migrations';
 
   static Future<void> onConfigure(Database database) async {
@@ -84,6 +85,12 @@ abstract final class AppDatabaseSchema {
           await AppDatabaseMigrationV7.apply(database);
           await database.insert(migrationTable, <String, Object?>{
             'version': 7,
+            'applied_at_utc': DateTime.now().toUtc().toIso8601String(),
+          });
+        case 8:
+          await AppDatabaseMigrationV8.apply(database);
+          await database.insert(migrationTable, <String, Object?>{
+            'version': 8,
             'applied_at_utc': DateTime.now().toUtc().toIso8601String(),
           });
         default:

@@ -14,14 +14,14 @@ void main() {
 
     expect(
       (await database.rawQuery('PRAGMA user_version')).single['user_version'],
-      7,
+      8,
     );
     expect(
       (await database.query(
         AppDatabaseSchema.migrationTable,
         orderBy: 'version ASC',
       )).map((row) => row['version']),
-      [1, 2, 3, 4, 5, 6, 7],
+      [1, 2, 3, 4, 5, 6, 7, 8],
     );
     await database.insert(
       AppDatabaseMigrationV5.recommendationRecordsTable,
@@ -55,7 +55,7 @@ void main() {
     expect((await upgraded.query('preserved_v4')).single['value'], 'kept');
     expect(
       (await upgraded.rawQuery('PRAGMA user_version')).single['user_version'],
-      7,
+      8,
     );
   });
 }

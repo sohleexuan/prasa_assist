@@ -94,6 +94,16 @@ void main() {
     expect(find.text('2026-08-27 07:45 MYT'), findsOneWidget);
   });
 
+  testWidgets('created-by fallback never reveals UUID or email', (
+    tester,
+  ) async {
+    const uuid = '00000000-0000-0000-0000-000000000001';
+    await _pumpDetail(tester, deployments: [_deployment(createdBy: uuid)]);
+
+    expect(find.text('Staff profile unavailable'), findsOneWidget);
+    expect(find.text(uuid), findsNothing);
+  });
+
   testWidgets('uses fixed Malaysia time for service and audit timestamps', (
     tester,
   ) async {

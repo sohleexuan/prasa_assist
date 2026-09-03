@@ -9,6 +9,7 @@ import 'package:prasa_assist/features/incidents/integration/m1_incident_recommen
 import 'package:prasa_assist/features/incidents/models/incident.dart';
 import 'package:prasa_assist/features/incidents/models/incident_enums.dart';
 import 'package:prasa_assist/features/incidents/models/incident_query.dart';
+import 'package:prasa_assist/features/incidents/models/incident_status_change.dart';
 import 'package:prasa_assist/features/incidents/pages/incident_detail_page.dart';
 import 'package:prasa_assist/features/incidents/repositories/in_memory_incident_repository.dart';
 
@@ -101,6 +102,32 @@ void main() {
     );
     expect(find.text('Reported → Under Review'), findsOneWidget);
     expect(find.textContaining('staff-001'), findsWidgets);
+  });
+
+  testWidgets('detail hides bare reporter and history identity values', (
+    tester,
+  ) async {
+    final incident = IncidentDemoData.busB1023().copyWith(
+      reportedBy: 'legacy.reporter@example.test',
+      statusHistory: [
+        IncidentStatusChange(
+          fromStatus: null,
+          toStatus: IncidentStatus.reported,
+          changedAt: DateTime.utc(2026, 8, 28),
+          changedBy: '22222222-2222-4222-8222-222222222222',
+        ),
+      ],
+    );
+    final repository = InMemoryIncidentRepository(seedData: [incident]);
+
+    await _pumpDetail(tester, repository: repository);
+
+    expect(find.textContaining('legacy.reporter@example.test'), findsNothing);
+    expect(
+      find.textContaining('22222222-2222-4222-8222-222222222222'),
+      findsNothing,
+    );
+    expect(find.text('Staff profile unavailable'), findsWidgets);
   });
 
   testWidgets('dismisses a status dialog without changing data', (

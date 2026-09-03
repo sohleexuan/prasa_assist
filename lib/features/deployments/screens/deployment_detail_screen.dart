@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/staff/staff_profile.dart';
+
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -258,7 +260,10 @@ class _DeploymentDetailScreenState extends State<DeploymentDetailScreen> {
             icon: Icons.history_outlined,
             child: Column(
               children: [
-                _DetailItem(label: 'Created by', value: deployment.createdBy),
+                _DetailItem(
+                  label: 'Created by',
+                  value: safeStaffDisplayLabel(deployment.createdBy),
+                ),
                 _DetailItem(
                   label: 'Created at',
                   value: formatDeploymentLocalDateTime(deployment.createdAt),

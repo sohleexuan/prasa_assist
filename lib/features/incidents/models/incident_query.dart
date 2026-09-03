@@ -1,5 +1,6 @@
 import 'incident.dart';
 import 'incident_enums.dart';
+import '../../../shared/staff/staff_profile.dart';
 
 enum IncidentSortOrder {
   newestReported,
@@ -61,7 +62,7 @@ class IncidentQuery {
       incident.routeName,
       incident.vehicleId,
       incident.location,
-      incident.reportedBy,
+      safeStaffDisplayLabel(incident.reportedBy),
     ];
     return searchableValues.any(
       (value) => value?.toLowerCase().contains(normalizedSearch) ?? false,

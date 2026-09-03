@@ -9,6 +9,8 @@ import '../../../shared/widgets/app_error_state.dart';
 import '../../../shared/widgets/app_loading_indicator.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
 import '../../../shared/widgets/app_section_card.dart';
+import '../../../shared/staff/staff_directory_repository.dart';
+import '../../../shared/staff/staff_profile.dart';
 import '../controllers/incident_controller.dart';
 import '../controllers/incident_state.dart';
 import '../integration/m1_incident_recommendation_facts.dart';
@@ -32,6 +34,8 @@ import 'incident_report_page.dart';
 class IncidentListPage extends StatefulWidget {
   const IncidentListPage({
     required this.currentStaffId,
+    this.currentUserId,
+    this.staffDirectoryRepository,
     this.repository,
     this.onReportIncident,
     this.onOpenIncident,
@@ -42,6 +46,8 @@ class IncidentListPage extends StatefulWidget {
   });
 
   final String currentStaffId;
+  final String? currentUserId;
+  final StaffDirectoryRepository? staffDirectoryRepository;
   final IncidentRepository? repository;
   final VoidCallback? onReportIncident;
   final ValueChanged<Incident>? onOpenIncident;
@@ -56,10 +62,14 @@ class IncidentListPage extends StatefulWidget {
 class _IncidentListPageState extends State<IncidentListPage> {
   final TextEditingController _searchController = TextEditingController();
   late final IncidentController _controller;
+  late String _currentStaffLabel;
 
   @override
   void initState() {
     super.initState();
+    _currentStaffLabel = widget.currentStaffId.trim().isEmpty
+        ? ''
+        : safeStaffDisplayLabel(widget.currentStaffId);
     _controller = IncidentController(
       repository:
           widget.repository ??
@@ -69,8 +79,26 @@ class _IncidentListPageState extends State<IncidentListPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         unawaited(_controller.loadIncidents());
+        unawaited(_resolveCurrentStaffLabel());
       }
     });
+  }
+
+  Future<void> _resolveCurrentStaffLabel() async {
+    final repository = widget.staffDirectoryRepository;
+    final currentUserId = widget.currentUserId;
+    if (repository == null || currentUserId == null) return;
+    var resolvedLabel = staffProfileUnavailableLabel;
+    try {
+      final directory = await repository.load();
+      resolvedLabel =
+          directory.findByUserId(currentUserId)?.displayLabel ??
+          staffProfileUnavailableLabel;
+    } catch (_) {
+      resolvedLabel = staffProfileUnavailableLabel;
+    }
+    if (!mounted) return;
+    setState(() => _currentStaffLabel = resolvedLabel);
   }
 
   @override
@@ -325,7 +353,7 @@ class _IncidentListPageState extends State<IncidentListPage> {
       MaterialPageRoute(
         builder: (routeContext) => IncidentReportPage(
           controller: _controller,
-          reportedBy: widget.currentStaffId,
+          reportedBy: _currentStaffLabel,
           clock: widget.clock,
           incidentIdGenerator: widget.incidentIdGenerator,
           onSaved: (_) => Navigator.of(routeContext).pop(),
@@ -341,7 +369,7 @@ class _IncidentListPageState extends State<IncidentListPage> {
         builder: (routeContext) => IncidentDetailPage(
           controller: _controller,
           incidentId: incident.incidentId,
-          currentStaffId: widget.currentStaffId,
+          currentStaffId: _currentStaffLabel,
           clock: widget.clock,
           onPrepareIncidentRecommendation:
               widget.onPrepareIncidentRecommendation,

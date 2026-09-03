@@ -9,6 +9,8 @@ import 'package:prasa_assist/features/work_orders/models/work_order_read_result.
 import 'package:prasa_assist/features/work_orders/repositories/work_order_data_exception.dart';
 import 'package:prasa_assist/features/work_orders/repositories/work_order_hybrid_operations.dart';
 import 'package:prasa_assist/core/database/local_sync_state.dart';
+import 'package:prasa_assist/shared/staff/staff_directory_repository.dart';
+import 'package:prasa_assist/shared/staff/staff_profile.dart';
 
 void main() {
   final operationTime = DateTime(2026, 8, 28, 10, 30);
@@ -139,8 +141,11 @@ void main() {
     await controller.openWorkOrder('WO-1');
     expect(controller.findById('WO-1')?.status, WorkOrderStatus.open);
 
-    await controller.assignWorkOrder('WO-1', assignedTo: '  Staff B  ');
-    expect(controller.findById('WO-1')?.assignedTo, 'Staff B');
+    await controller.assignWorkOrderToStaff(
+      'WO-1',
+      assignee: _maintenanceProfile,
+    );
+    expect(controller.findById('WO-1')?.assignedTo, 'Staff B (M-002)');
     expect(controller.findById('WO-1')?.status, WorkOrderStatus.assigned);
 
     await controller.startWork('WO-1');
@@ -190,7 +195,7 @@ void main() {
     await controller.load();
 
     await expectLater(
-      controller.assignWorkOrder('WO-1', assignedTo: 'Staff B'),
+      controller.assignWorkOrderToStaff('WO-1', assignee: _maintenanceProfile),
       throwsA(isA<WorkOrderValidationException>()),
     );
     final unchanged = await repository.read('WO-1');
@@ -231,7 +236,17 @@ void main() {
       );
       await assignmentController.load();
       await expectLater(
-        assignmentController.assignWorkOrder('WO-1', assignedTo: '   '),
+        assignmentController.assignWorkOrderToStaff(
+          'WO-1',
+          assignee: StaffProfile(
+            userId: '22222222-2222-4222-8222-222222222222',
+            staffCode: 'M-002',
+            displayName: 'Staff B',
+            role: StaffRole.maintenanceStaff,
+            active: false,
+            version: 1,
+          ),
+        ),
         throwsA(isA<WorkOrderValidationException>()),
       );
       expect(
@@ -254,6 +269,8 @@ void main() {
               taskType: 'Brake repair',
               description: 'Replace brake pads',
               assignedTo: 'Aina Rahman',
+              assignedToUserId: '22222222-2222-4222-8222-222222222222',
+              assignedToLabelSnapshot: 'Aina Rahman (M-2040)',
               status: WorkOrderStatus.assigned,
             ),
           ],
@@ -331,7 +348,7 @@ void main() {
       );
 
       expect(controller.visibleWorkOrders, [saved]);
-      expect(saved.createdBy, 'cloud.staff@example.com');
+      expect(saved.createdBy, 'Staff profile unavailable');
       expect(
         saved.notes,
         'Advisory note supplied by the accepted recommendation.',
@@ -472,6 +489,59 @@ void main() {
       expect(cancelled.hasLegacyScheduleEquality, isTrue);
     },
   );
+
+  test(
+    'production hybrid assignment forwards UUID and expected version',
+    () async {
+      final open = _confirmedRecord().copyWith(
+        status: WorkOrderStatus.open,
+        remoteVersion: 2,
+      );
+      final operations = _HybridOperationsFake(confirmed: [open]);
+      final controller = WorkOrdersController.hybrid(
+        operations,
+        currentUserId: _supervisorProfile.userId,
+        staffDirectoryRepository: _ControllerDirectoryFake(),
+      );
+      addTearDown(controller.dispose);
+      await controller.load();
+
+      await controller.assignWorkOrderToStaff(
+        open.workOrderId,
+        assignee: _maintenanceProfile,
+      );
+
+      expect(operations.assignmentCalls, 1);
+      expect(operations.lastAssignedToUserId, _maintenanceProfile.userId);
+      expect(operations.lastExpectedVersion, 2);
+    },
+  );
+
+  test('unauthorized current profile is rejected before assignment', () async {
+    final open = _confirmedRecord().copyWith(status: WorkOrderStatus.open);
+    final operations = _HybridOperationsFake(confirmed: [open]);
+    final controller = WorkOrdersController.hybrid(
+      operations,
+      currentUserId: _operationsProfile.userId,
+      staffDirectoryRepository: _ControllerDirectoryFake(),
+    );
+    addTearDown(controller.dispose);
+    await controller.load();
+
+    expect(controller.canAssignWorkOrders, isFalse);
+    expect(
+      controller.assignmentUnavailableReason,
+      'Only active supervisors or control-centre staff can assign work orders.',
+    );
+    await expectLater(
+      controller.assignWorkOrderToStaff(
+        open.workOrderId,
+        assignee: _maintenanceProfile,
+      ),
+      throwsA(isA<WorkOrderValidationException>()),
+    );
+    expect(operations.assignmentCalls, 0);
+  });
 }
 
 class _HybridOperationsFake implements WorkOrderHybridOperations {
@@ -487,7 +557,9 @@ class _HybridOperationsFake implements WorkOrderHybridOperations {
   int createDraftCalls = 0;
   int publicationCalls = 0;
   int transitionCalls = 0;
+  int assignmentCalls = 0;
   int? lastExpectedVersion;
+  String? lastAssignedToUserId;
   WorkOrderStatus? lastTransitionTarget;
   final List<String> publicationKeys = [];
 
@@ -575,9 +647,26 @@ class _HybridOperationsFake implements WorkOrderHybridOperations {
   @override
   Future<WorkOrder> assignConfirmed(
     String workOrderId, {
-    required String assignedTo,
+    required String assignedToUserId,
     required int expectedVersion,
-  }) => throw UnimplementedError();
+  }) async {
+    assignmentCalls += 1;
+    lastAssignedToUserId = assignedToUserId;
+    lastExpectedVersion = expectedVersion;
+    final index = _confirmed.indexWhere(
+      (record) => record.workOrderId == workOrderId,
+    );
+    final updated = _confirmed[index].copyWith(
+      assignedTo: _maintenanceProfile.displayLabel,
+      assignedToUserId: assignedToUserId,
+      assignedToLabelSnapshot: _maintenanceProfile.displayLabel,
+      status: WorkOrderStatus.assigned,
+      remoteVersion: expectedVersion + 1,
+    );
+    _confirmed[index] = updated;
+    return updated;
+  }
+
   @override
   Future<WorkOrder> transitionConfirmed(
     String workOrderId, {
@@ -614,6 +703,54 @@ class _HybridOperationsFake implements WorkOrderHybridOperations {
   ) => throw UnimplementedError();
 }
 
+class _ControllerDirectoryFake implements StaffDirectoryRepository {
+  @override
+  Future<StaffDirectorySnapshot> load() async => _directorySnapshot([
+    _supervisorProfile,
+    _operationsProfile,
+    _maintenanceProfile,
+  ]);
+
+  @override
+  Future<StaffDirectorySnapshot> loadAssignable() async =>
+      _directorySnapshot([_maintenanceProfile]);
+}
+
+StaffDirectorySnapshot _directorySnapshot(List<StaffProfile> profiles) =>
+    StaffDirectorySnapshot(
+      profiles: profiles,
+      source: StaffDirectorySource.liveSupabase,
+      retrievedAt: DateTime.utc(2026, 9, 3),
+      isStale: false,
+    );
+
+final _maintenanceProfile = StaffProfile(
+  userId: '22222222-2222-4222-8222-222222222222',
+  staffCode: 'M-002',
+  displayName: 'Staff B',
+  role: StaffRole.maintenanceStaff,
+  active: true,
+  version: 1,
+);
+
+final _supervisorProfile = StaffProfile(
+  userId: '33333333-3333-4333-8333-333333333333',
+  staffCode: 'S-001',
+  displayName: 'Supervisor One',
+  role: StaffRole.supervisor,
+  active: true,
+  version: 1,
+);
+
+final _operationsProfile = StaffProfile(
+  userId: '55555555-5555-4555-8555-555555555555',
+  staffCode: 'O-001',
+  displayName: 'Operations One',
+  role: StaffRole.operationsStaff,
+  active: true,
+  version: 1,
+);
+
 WorkOrder _confirmedRecord({bool includeSchedule = true}) => WorkOrder(
   workOrderId: 'WO-20260831-000001',
   vehicleId: 'B1023',
@@ -636,6 +773,8 @@ WorkOrder _readyRecord({
   String taskType = 'Inspection',
   String description = 'Inspect Route 300 breakdown',
   String? assignedTo,
+  String? assignedToUserId,
+  String? assignedToLabelSnapshot,
   WorkOrderStatus status = WorkOrderStatus.draft,
   DateTime? scheduledStart,
   DateTime? scheduledEnd,
@@ -655,6 +794,8 @@ WorkOrder _readyRecord({
                 status == WorkOrderStatus.completed
             ? 'Staff B'
             : null),
+    assignedToUserId: assignedToUserId,
+    assignedToLabelSnapshot: assignedToLabelSnapshot,
     scheduledStart: includeSchedule
         ? scheduledStart ?? DateTime(2026, 8, 28, 9)
         : null,

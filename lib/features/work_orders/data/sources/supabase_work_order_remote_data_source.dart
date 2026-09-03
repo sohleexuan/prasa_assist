@@ -21,7 +21,8 @@ class SupabaseWorkOrderGateway implements WorkOrderSupabaseGateway {
 
   static const selection =
       'id,work_order_id,incident_id,recommendation_id,route_id,vehicle_id,task_type,'
-      'description,priority,assigned_to,scheduled_start,scheduled_end,status,'
+      'description,priority,assigned_to,assigned_to_user_id,'
+      'assigned_to_label_snapshot,scheduled_start,scheduled_end,status,'
       'notes,created_by_user_id,created_by_label,created_at,updated_at,'
       'completed_at,cancelled_at,version';
 
@@ -53,7 +54,7 @@ class SupabaseWorkOrderRemoteDataSource implements WorkOrderRemoteDataSource {
 
   static const createRpc = 'create_work_order';
   static const updateRpc = 'update_work_order';
-  static const assignRpc = 'assign_work_order';
+  static const assignRpc = 'assign_work_order_to_staff';
   static const transitionRpc = 'transition_work_order';
 
   final WorkOrderSupabaseGateway _gateway;
@@ -132,13 +133,13 @@ class SupabaseWorkOrderRemoteDataSource implements WorkOrderRemoteDataSource {
   @override
   Future<WorkOrderRecordDto> assign(
     String workOrderId, {
-    required String assignedTo,
+    required String assignedToUserId,
     required int expectedVersion,
   }) async {
     final response = await _request(
       () => _gateway.invokeRpc(assignRpc, <String, dynamic>{
         'p_work_order_id': workOrderId.trim(),
-        'p_assigned_to': assignedTo.trim(),
+        'p_assigned_to_user_id': assignedToUserId.trim(),
         'p_expected_version': expectedVersion,
       }),
     );
@@ -210,6 +211,7 @@ class SupabaseWorkOrderRemoteDataSource implements WorkOrderRemoteDataSource {
           'A matching confirmed work order already exists.',
           cause: error,
         ),
+        '0A000' ||
         '22007' ||
         '22023' ||
         '22P02' ||

@@ -67,7 +67,7 @@ class _FakeRemote implements WorkOrderRemoteDataSource {
   @override
   Future<WorkOrderRecordDto> assign(
     String workOrderId, {
-    required String assignedTo,
+    required String assignedToUserId,
     required int expectedVersion,
   }) => throw UnimplementedError();
   @override

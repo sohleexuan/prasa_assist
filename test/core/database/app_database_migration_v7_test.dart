@@ -10,7 +10,7 @@ import '../../support/sqlite_test_database.dart';
 
 void main() {
   test(
-    'v6 upgrade preserves and safely remediates legacy equality rows',
+    'v6 upgrade through current schema preserves legacy equality rows',
     () async {
       final directory = await Directory.systemTemp.createTemp('prasa-v7-');
       addTearDown(() => directory.delete(recursive: true));
@@ -36,14 +36,14 @@ void main() {
 
       expect(
         (await upgraded.rawQuery('PRAGMA user_version')).single['user_version'],
-        7,
+        8,
       );
       expect(
         (await upgraded.query(
           AppDatabaseSchema.migrationTable,
           orderBy: 'version ASC',
         )).map((row) => row['version']),
-        [1, 2, 3, 4, 5, 6, 7],
+        [1, 2, 3, 4, 5, 6, 7, 8],
       );
       final source = SqliteWorkOrderLocalDataSource(
         database: upgraded,

@@ -16,7 +16,12 @@ void main() {
       taskType: 'Inspection',
       description: 'Inspect Route 300 breakdown.',
       priority: WorkOrderPriority.urgent,
-      status: WorkOrderStatus.open,
+      assignedTo: 'Maintenance One (M-001)',
+      assignedToUserId: '22222222-2222-4222-8222-222222222222',
+      assignedToLabelSnapshot: 'Maintenance One (M-001)',
+      scheduledStart: DateTime.utc(2026, 8, 29, 1),
+      scheduledEnd: DateTime.utc(2026, 8, 29, 2),
+      status: WorkOrderStatus.assigned,
       createdByUserId: '11111111-1111-4111-8111-111111111111',
       createdByLabel: 'Staff A',
       createdAt: DateTime.utc(2026, 8, 29),
@@ -29,6 +34,8 @@ void main() {
     expect(domain.routeId, '300');
     expect(domain.remoteVersion, 4);
     expect(domain.createdByUserId, dto.createdByUserId);
+    expect(domain.assignedToUserId, dto.assignedToUserId);
+    expect(domain.assignedToLabelSnapshot, 'Maintenance One (M-001)');
   });
 
   test('toDto rejects an absent remote version with a safe exception', () {

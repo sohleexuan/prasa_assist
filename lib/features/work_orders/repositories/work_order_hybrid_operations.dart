@@ -25,7 +25,7 @@ abstract interface class WorkOrderHybridOperations {
   });
   Future<WorkOrder> assignConfirmed(
     String workOrderId, {
-    required String assignedTo,
+    required String assignedToUserId,
     required int expectedVersion,
   });
   Future<WorkOrder> transitionConfirmed(

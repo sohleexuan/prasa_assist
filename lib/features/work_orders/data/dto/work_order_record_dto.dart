@@ -19,6 +19,8 @@ class WorkOrderRecordDto {
     String? recommendationId,
     String? routeId,
     String? assignedTo,
+    String? assignedToUserId,
+    String? assignedToLabelSnapshot,
     DateTime? scheduledStart,
     DateTime? scheduledEnd,
     String? notes,
@@ -34,6 +36,8 @@ class WorkOrderRecordDto {
        taskType = _required(taskType, 'Task type'),
        description = _required(description, 'Description'),
        assignedTo = _optional(assignedTo),
+       assignedToUserId = _optionalUuid(assignedToUserId),
+       assignedToLabelSnapshot = _optional(assignedToLabelSnapshot),
        scheduledStart = scheduledStart?.toUtc(),
        scheduledEnd = scheduledEnd?.toUtc(),
        notes = _optional(notes),
@@ -58,6 +62,8 @@ class WorkOrderRecordDto {
       description: this.description,
       priority: priority,
       assignedTo: this.assignedTo,
+      assignedToUserId: this.assignedToUserId,
+      assignedToLabelSnapshot: this.assignedToLabelSnapshot,
       scheduledStart: this.scheduledStart,
       scheduledEnd: this.scheduledEnd,
       status: status,
@@ -83,6 +89,8 @@ class WorkOrderRecordDto {
   final String description;
   final WorkOrderPriority priority;
   final String? assignedTo;
+  final String? assignedToUserId;
+  final String? assignedToLabelSnapshot;
   final DateTime? scheduledStart;
   final DateTime? scheduledEnd;
   final WorkOrderStatus status;
@@ -111,6 +119,11 @@ class WorkOrderRecordDto {
         description: _mapString(map, 'description'),
         priority: _priority(map['priority']),
         assignedTo: _mapOptionalString(map, 'assigned_to'),
+        assignedToUserId: _mapOptionalString(map, 'assigned_to_user_id'),
+        assignedToLabelSnapshot: _mapOptionalString(
+          map,
+          'assigned_to_label_snapshot',
+        ),
         scheduledStart: _mapOptionalDate(map, 'scheduled_start'),
         scheduledEnd: _mapOptionalDate(map, 'scheduled_end'),
         status: _status(map['status']),
@@ -145,6 +158,8 @@ class WorkOrderRecordDto {
     'description': description,
     'priority': priority.name,
     'assigned_to': assignedTo,
+    'assigned_to_user_id': assignedToUserId,
+    'assigned_to_label_snapshot': assignedToLabelSnapshot,
     'scheduled_start': scheduledStart?.toIso8601String(),
     'scheduled_end': scheduledEnd?.toIso8601String(),
     'status': status == WorkOrderStatus.inProgress
@@ -169,6 +184,12 @@ class WorkOrderRecordDto {
   static String? _optional(String? value) {
     final trimmed = value?.trim();
     return trimmed == null || trimmed.isEmpty ? null : trimmed;
+  }
+
+  static String? _optionalUuid(String? value) {
+    final normalized = _optional(value);
+    if (normalized == null) return null;
+    return _uuid(normalized, 'Assigned staff user ID');
   }
 
   static String _uuid(String value, String label) {

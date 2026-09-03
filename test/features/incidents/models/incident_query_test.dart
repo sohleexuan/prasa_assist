@@ -60,6 +60,37 @@ void main() {
       );
     });
 
+    test('search excludes bare legacy email and UUID identity values', () {
+      final incident = IncidentDemoData.busB1023();
+      final withEmail = incident.copyWith(
+        reportedBy: 'legacy.reporter@example.test',
+      );
+      final withUuid = incident.copyWith(
+        reportedBy: '22222222-2222-4222-8222-222222222222',
+      );
+
+      expect(
+        IncidentQuery(searchTerm: 'legacy.reporter').matches(withEmail),
+        isFalse,
+      );
+      expect(IncidentQuery(searchTerm: '22222222').matches(withUuid), isFalse);
+    });
+
+    test('search preserves normal names and canonical staff labels', () {
+      final incident = IncidentDemoData.busB1023();
+
+      expect(
+        IncidentQuery(searchTerm: 'operations staff')
+            .matches(incident.copyWith(reportedBy: 'Operations Staff')),
+        isTrue,
+      );
+      expect(
+        IncidentQuery(searchTerm: 'O-001')
+            .matches(incident.copyWith(reportedBy: 'Operations Staff (O-001)')),
+        isTrue,
+      );
+    });
+
     test('combines filter dimensions with AND logic', () {
       final incident = IncidentDemoData.busB1023();
 

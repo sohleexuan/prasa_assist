@@ -30,14 +30,14 @@ void main() {
 
       expect(
         (await upgraded.rawQuery('PRAGMA user_version')).single['user_version'],
-        7,
+        8,
       );
       expect(
         (await upgraded.query(
           AppDatabaseSchema.migrationTable,
           orderBy: 'version ASC',
         )).map((row) => row['version']),
-        [1, 2, 3, 4, 5, 6, 7],
+        [1, 2, 3, 4, 5, 6, 7, 8],
       );
       expect(
         (await upgraded.query(

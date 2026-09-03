@@ -10,6 +10,8 @@ void main() {
     expect(dto.incidentId, 'INC-1');
     expect(dto.recommendationId, 'REC-1');
     expect(dto.routeId, '300');
+    expect(dto.assignedToUserId, '22222222-2222-4222-8222-222222222222');
+    expect(dto.assignedToLabelSnapshot, 'Maintenance One (M-001)');
     expect(dto.createdAt.isUtc, isTrue);
     expect(dto.remoteVersion, 3);
     expect(WorkOrderRecordDto.fromMap(dto.toMap()).toMap(), dto.toMap());
@@ -50,9 +52,12 @@ WorkOrderRecordDto _dto({
   taskType: 'Inspection',
   description: 'Inspect Route 300 breakdown.',
   priority: WorkOrderPriority.urgent,
+  assignedTo: 'Maintenance One (M-001)',
+  assignedToUserId: '22222222-2222-4222-8222-222222222222',
+  assignedToLabelSnapshot: 'Maintenance One (M-001)',
   scheduledStart: DateTime.parse('2026-08-29T10:00:00+08:00'),
   scheduledEnd: DateTime.parse('2026-08-29T11:00:00+08:00'),
-  status: WorkOrderStatus.open,
+  status: WorkOrderStatus.assigned,
   createdByUserId: '11111111-1111-4111-8111-111111111111',
   createdByLabel: 'Staff A',
   createdAt: DateTime.parse('2026-08-29T09:00:00+08:00'),

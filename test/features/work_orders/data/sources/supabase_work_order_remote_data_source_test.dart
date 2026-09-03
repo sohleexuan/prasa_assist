@@ -84,6 +84,31 @@ void main() {
       });
     });
 
+    test('assignment sends only stable UUID and expected version', () async {
+      final gateway = _Gateway()
+        ..rpcResponse = _row(
+          status: 'assigned',
+          version: 3,
+          assignedToUserId: '44444444-4444-4444-8444-444444444444',
+        );
+      final source = SupabaseWorkOrderRemoteDataSource.withGateway(gateway);
+
+      final result = await source.assign(
+        'WO-20260830-000001',
+        assignedToUserId: '44444444-4444-4444-8444-444444444444',
+        expectedVersion: 2,
+      );
+
+      expect(gateway.rpcName, SupabaseWorkOrderRemoteDataSource.assignRpc);
+      expect(gateway.params, {
+        'p_work_order_id': 'WO-20260830-000001',
+        'p_assigned_to_user_id': '44444444-4444-4444-8444-444444444444',
+        'p_expected_version': 2,
+      });
+      expect(gateway.params, isNot(contains('p_assigned_to')));
+      expect(result.assignedToLabelSnapshot, 'Maintenance One (M-001)');
+    });
+
     test('does not blindly retry an ambiguous write', () async {
       final gateway = _Gateway()..error = TimeoutException('unsafe detail');
       final source = SupabaseWorkOrderRemoteDataSource.withGateway(gateway);
@@ -101,6 +126,7 @@ void main() {
           '40001': WorkOrderConflictException,
           '42501': WorkOrderPermissionException,
           '22023': WorkOrderValidationException,
+          '0A000': WorkOrderValidationException,
           'P0002': WorkOrderNotFoundException,
         }.entries) {
           final gateway = _Gateway()
@@ -146,7 +172,11 @@ LocalWorkOrderDraft _draft() => LocalWorkOrderDraft(
   createdByLabel: 'non-authoritative local label',
 );
 
-Map<String, dynamic> _row({String status = 'draft', int version = 1}) => {
+Map<String, dynamic> _row({
+  String status = 'draft',
+  int version = 1,
+  String? assignedToUserId,
+}) => {
   'id': '22222222-2222-4222-8222-222222222222',
   'work_order_id': 'WO-20260830-000001',
   'incident_id': 'INC-B1023-ROUTE-300',
@@ -156,9 +186,21 @@ Map<String, dynamic> _row({String status = 'draft', int version = 1}) => {
   'task_type': 'Inspection',
   'description': 'Inspect Bus B1023 after its Route 300 breakdown.',
   'priority': 'urgent',
-  'assigned_to': status == 'in_progress' ? 'Technician A' : null,
-  'scheduled_start': status == 'in_progress' ? '2026-08-30T08:00:00Z' : null,
-  'scheduled_end': status == 'in_progress' ? '2026-08-30T09:00:00Z' : null,
+  'assigned_to': assignedToUserId != null
+      ? 'Maintenance One (M-001)'
+      : status == 'in_progress'
+      ? 'Technician A'
+      : null,
+  'assigned_to_user_id': assignedToUserId,
+  'assigned_to_label_snapshot': assignedToUserId == null
+      ? null
+      : 'Maintenance One (M-001)',
+  'scheduled_start': status == 'in_progress' || status == 'assigned'
+      ? '2026-08-30T08:00:00Z'
+      : null,
+  'scheduled_end': status == 'in_progress' || status == 'assigned'
+      ? '2026-08-30T09:00:00Z'
+      : null,
   'status': status,
   'notes': null,
   'created_by_user_id': '33333333-3333-4333-8333-333333333333',

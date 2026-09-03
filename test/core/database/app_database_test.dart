@@ -26,7 +26,16 @@ void main() {
 
         expect(userVersion.single['user_version'], AppDatabaseSchema.version);
         expect(foreignKeys.single['foreign_keys'], 1);
-        expect(migrations.map((row) => row['version']), [1, 2, 3, 4, 5, 6, 7]);
+        expect(migrations.map((row) => row['version']), [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+        ]);
         expect(
           migrations.every(
             (row) => DateTime.parse(row['applied_at_utc']! as String).isUtc,

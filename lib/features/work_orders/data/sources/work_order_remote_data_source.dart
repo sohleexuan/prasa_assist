@@ -17,7 +17,7 @@ abstract interface class WorkOrderRemoteDataSource {
   });
   Future<WorkOrderRecordDto> assign(
     String workOrderId, {
-    required String assignedTo,
+    required String assignedToUserId,
     required int expectedVersion,
   });
   Future<WorkOrderRecordDto> transitionStatus(

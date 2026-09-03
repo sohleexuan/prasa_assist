@@ -75,7 +75,7 @@ void main() {
     expect(find.text('Module integration pending'), findsNothing);
   });
 
-  testWidgets('incident registry builder injects the signed-in staff label', (
+  testWidgets('incident registry never exposes the session email as a label', (
     tester,
   ) async {
     final gateway = FakeAuthGateway(
@@ -104,12 +104,12 @@ void main() {
 
     expect(builtPage, isNotNull);
     expect(builtPage!.repository, isA<HybridIncidentRepository>());
-    expect(builtPage!.currentStaffId, 'incident.staff@example.com');
+    expect(builtPage!.currentStaffId, 'Staff profile unavailable');
+    expect(builtPage!.currentUserId, '00000000-0000-4000-8000-000000000010');
+    expect(builtPage!.staffDirectoryRepository, isNotNull);
   });
 
-  testWidgets('incident registry uses the auth UUID without an email', (
-    tester,
-  ) async {
+  testWidgets('incident registry keeps the auth UUID internal', (tester) async {
     final gateway = FakeAuthGateway(
       initialSession: const AuthSession(
         userId: '00000000-0000-4000-8000-000000000011',
@@ -133,7 +133,8 @@ void main() {
       ),
     );
 
-    expect(builtPage!.currentStaffId, '00000000-0000-4000-8000-000000000011');
+    expect(builtPage!.currentStaffId, 'Staff profile unavailable');
+    expect(builtPage!.currentUserId, '00000000-0000-4000-8000-000000000011');
   });
 
   testWidgets('normal Work Order destination uses production hybrid wiring', (
@@ -386,7 +387,7 @@ void main() {
       expect(database.lastInsertValues, containsPair('priority', 'high'));
       expect(
         database.lastInsertValues,
-        containsPair('created_by_label', 'maintenance.staff@example.com'),
+        containsPair('created_by_label', 'Staff profile unavailable'),
       );
       expect(
         database.lastInsertValues!['notes'],
@@ -455,7 +456,7 @@ void main() {
         find.byType(ServiceDeploymentPage, skipOffstage: false),
       );
       expect(deploymentPage.repository, isA<HybridDeploymentRepository>());
-      expect(deploymentPage.currentUserId, 'deployment.staff@example.com');
+      expect(deploymentPage.currentUserId, 'Staff profile unavailable');
       expect(deploymentPage.initialCreatePrefill, same(prefill));
 
       expect(find.byType(DeploymentFormScreen), findsOneWidget);
@@ -481,7 +482,7 @@ void main() {
   );
 
   testWidgets(
-    'deployment registry builder injects Supabase persistence and auth label',
+    'deployment registry injects persistence without exposing auth email',
     (tester) async {
       final gateway = FakeAuthGateway(
         initialSession: const AuthSession(
@@ -511,12 +512,12 @@ void main() {
 
       expect(builtPage, isNotNull);
       expect(builtPage!.repository, isA<HybridDeploymentRepository>());
-      expect(builtPage!.currentUserId, 'staff@example.com');
+      expect(builtPage!.currentUserId, 'Staff profile unavailable');
     },
   );
 
   testWidgets(
-    'deployment registry uses stable auth UUID when no email is available',
+    'deployment registry does not expose auth UUID when email is unavailable',
     (tester) async {
       final gateway = FakeAuthGateway(
         initialSession: const AuthSession(
@@ -542,7 +543,7 @@ void main() {
         ),
       );
 
-      expect(builtPage!.currentUserId, '22222222-2222-4222-8222-222222222222');
+      expect(builtPage!.currentUserId, 'Staff profile unavailable');
     },
   );
 

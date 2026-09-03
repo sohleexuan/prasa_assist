@@ -20,6 +20,8 @@ class WorkOrder {
     String? recommendationId,
     String? routeId,
     String? assignedTo,
+    String? assignedToUserId,
+    String? assignedToLabelSnapshot,
     DateTime? scheduledStart,
     DateTime? scheduledEnd,
     String? notes,
@@ -35,6 +37,11 @@ class WorkOrder {
        taskType = _required(taskType, 'Task type'),
        description = _required(description, 'Description'),
        assignedTo = _optional(assignedTo),
+       assignedToUserId = _optionalUuid(
+         assignedToUserId,
+         'Assigned staff user ID',
+       ),
+       assignedToLabelSnapshot = _optional(assignedToLabelSnapshot),
        scheduledStart = scheduledStart?.toUtc(),
        scheduledEnd = scheduledEnd?.toUtc(),
        notes = _optional(notes),
@@ -58,6 +65,8 @@ class WorkOrder {
   final String description;
   final WorkOrderPriority priority;
   final String? assignedTo;
+  final String? assignedToUserId;
+  final String? assignedToLabelSnapshot;
   final DateTime? scheduledStart;
   final DateTime? scheduledEnd;
   final WorkOrderStatus status;
@@ -83,6 +92,8 @@ class WorkOrder {
     String? description,
     WorkOrderPriority? priority,
     Object? assignedTo = _unset,
+    Object? assignedToUserId = _unset,
+    Object? assignedToLabelSnapshot = _unset,
     Object? scheduledStart = _unset,
     Object? scheduledEnd = _unset,
     WorkOrderStatus? status,
@@ -108,6 +119,14 @@ class WorkOrder {
       description: description ?? this.description,
       priority: priority ?? this.priority,
       assignedTo: _nullable<String>(assignedTo, this.assignedTo),
+      assignedToUserId: _nullable<String>(
+        assignedToUserId,
+        this.assignedToUserId,
+      ),
+      assignedToLabelSnapshot: _nullable<String>(
+        assignedToLabelSnapshot,
+        this.assignedToLabelSnapshot,
+      ),
       scheduledStart: _nullable<DateTime>(scheduledStart, this.scheduledStart),
       scheduledEnd: _nullable<DateTime>(scheduledEnd, this.scheduledEnd),
       status: status ?? this.status,
@@ -148,9 +167,15 @@ class WorkOrder {
           WorkOrderStatus.inProgress,
           WorkOrderStatus.completed,
         }.contains(status) &&
-        assignedTo == null) {
+        assignedTo == null &&
+        assignedToLabelSnapshot == null) {
       throw const WorkOrderValidationException(
         'Responsible staff is required for this work-order status.',
+      );
+    }
+    if ((assignedToUserId == null) != (assignedToLabelSnapshot == null)) {
+      throw const WorkOrderValidationException(
+        'Stable assignment identity and label snapshot must be provided together.',
       );
     }
     switch (status) {
@@ -229,6 +254,8 @@ class WorkOrder {
           description == other.description &&
           priority == other.priority &&
           assignedTo == other.assignedTo &&
+          assignedToUserId == other.assignedToUserId &&
+          assignedToLabelSnapshot == other.assignedToLabelSnapshot &&
           scheduledStart == other.scheduledStart &&
           scheduledEnd == other.scheduledEnd &&
           status == other.status &&
@@ -242,7 +269,7 @@ class WorkOrder {
           remoteVersion == other.remoteVersion;
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     workOrderId,
     incidentId,
     recommendationId,
@@ -252,6 +279,8 @@ class WorkOrder {
     description,
     priority,
     assignedTo,
+    assignedToUserId,
+    assignedToLabelSnapshot,
     scheduledStart,
     scheduledEnd,
     status,
@@ -263,7 +292,7 @@ class WorkOrder {
     completedAt,
     cancelledAt,
     remoteVersion,
-  );
+  ]);
 }
 
 void validateWorkOrderSchedule(

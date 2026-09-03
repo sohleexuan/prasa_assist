@@ -29,6 +29,7 @@ import '../features/work_orders/models/work_order_prefill.dart';
 import '../features/work_orders/pages/work_order_form_page.dart';
 import '../features/work_orders/pages/work_order_list_page.dart';
 import '../features/work_orders/repositories/hybrid_work_order_repository.dart';
+import '../shared/staff/staff_profile.dart';
 
 typedef ModulePageBuilder = Widget Function(BuildContext context);
 
@@ -92,8 +93,6 @@ abstract final class ModuleRegistry {
         'An authenticated staff session is required to open incidents.',
       );
     }
-    final email = session.email?.trim();
-    final actorIdentifier = email?.isNotEmpty == true ? email! : session.userId;
     late final LocalUserScope userScope;
     try {
       userScope = LocalUserScope(session.userId);
@@ -113,7 +112,9 @@ abstract final class ModuleRegistry {
           userScope: userScope,
         ),
       ),
-      currentStaffId: actorIdentifier,
+      currentStaffId: staffProfileUnavailableLabel,
+      currentUserId: session.userId,
+      staffDirectoryRepository: dependencies.staffDirectoryFor(userScope),
       onPrepareIncidentRecommendation: (facts) => _openIncidentRecommendation(
         context,
         facts,
@@ -137,8 +138,6 @@ abstract final class ModuleRegistry {
         'An authenticated staff session is required to open deployments.',
       );
     }
-    final email = session.email?.trim();
-    final actorIdentifier = email?.isNotEmpty == true ? email! : session.userId;
     late final LocalUserScope userScope;
     try {
       userScope = LocalUserScope(session.userId);
@@ -166,7 +165,7 @@ abstract final class ModuleRegistry {
           },
         ),
       ),
-      currentUserId: actorIdentifier,
+      currentUserId: 'Staff profile unavailable',
       initialCreatePrefill: initialCreatePrefill,
     );
   }
@@ -181,7 +180,12 @@ abstract final class ModuleRegistry {
     }
     final recommendationRepository = _buildRecommendationRepository(context);
     return RecommendationListPage(
-      controller: RecommendationController(recommendationRepository),
+      controller: RecommendationController(
+        recommendationRepository,
+        staffDirectoryRepository: dependencies.staffDirectoryFor(
+          LocalUserScope(session.userId),
+        ),
+      ),
       onPrepareWorkOrder: (prefill) => Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (context) => _buildWorkOrderFormPage(context, prefill),
@@ -264,8 +268,6 @@ abstract final class ModuleRegistry {
       );
     }
     final userScope = LocalUserScope(session.userId);
-    final email = session.email?.trim();
-    final staffLabel = email?.isNotEmpty == true ? email! : session.userId;
     var localIdSequence = 0;
     final localDataSource = SqliteWorkOrderLocalDataSource(
       database: dependencies.appDatabase,
@@ -285,7 +287,9 @@ abstract final class ModuleRegistry {
     );
     return WorkOrdersController.hybrid(
       hybridRepository,
-      localDraftCreatedByLabel: staffLabel,
+      localDraftCreatedByLabel: 'Staff profile unavailable',
+      staffDirectoryRepository: dependencies.staffDirectoryFor(userScope),
+      currentUserId: session.userId,
     );
   }
 

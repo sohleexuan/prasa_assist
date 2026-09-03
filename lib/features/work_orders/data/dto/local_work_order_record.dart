@@ -18,6 +18,8 @@ class LocalWorkOrderRecord {
     String? remoteStorageId,
     String? workOrderId,
     String? assignedTo,
+    String? assignedToUserId,
+    String? assignedToLabelSnapshot,
     DateTime? remoteCreatedAt,
     DateTime? remoteUpdatedAt,
     DateTime? completedAt,
@@ -31,6 +33,8 @@ class LocalWorkOrderRecord {
        remoteStorageId = _optional(remoteStorageId),
        workOrderId = _optional(workOrderId),
        assignedTo = _optional(assignedTo),
+       assignedToUserId = _optional(assignedToUserId),
+       assignedToLabelSnapshot = _optional(assignedToLabelSnapshot),
        remoteCreatedAt = remoteCreatedAt?.toUtc(),
        remoteUpdatedAt = remoteUpdatedAt?.toUtc(),
        completedAt = completedAt?.toUtc(),
@@ -51,6 +55,8 @@ class LocalWorkOrderRecord {
   final String? remoteStorageId;
   final String? workOrderId;
   final String? assignedTo;
+  final String? assignedToUserId;
+  final String? assignedToLabelSnapshot;
   final DateTime? remoteCreatedAt;
   final DateTime? remoteUpdatedAt;
   final DateTime? completedAt;
@@ -80,6 +86,8 @@ class LocalWorkOrderRecord {
       description: draft.description,
       priority: draft.priority,
       assignedTo: assignedTo,
+      assignedToUserId: assignedToUserId,
+      assignedToLabelSnapshot: assignedToLabelSnapshot,
       scheduledStart: draft.scheduledStart,
       scheduledEnd: draft.scheduledEnd,
       status: status,
@@ -112,6 +120,8 @@ class LocalWorkOrderRecord {
         remoteStorageId == null &&
         workOrderId == null &&
         assignedTo == null &&
+        assignedToUserId == null &&
+        assignedToLabelSnapshot == null &&
         remoteCreatedAt == null &&
         remoteUpdatedAt == null &&
         completedAt == null &&

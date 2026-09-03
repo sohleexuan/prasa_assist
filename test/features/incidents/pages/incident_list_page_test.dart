@@ -13,6 +13,8 @@ import 'package:prasa_assist/features/incidents/repositories/in_memory_incident_
 import 'package:prasa_assist/features/incidents/repositories/incident_repository.dart';
 import 'package:prasa_assist/features/incidents/services/delay_estimator.dart';
 import 'package:prasa_assist/features/incidents/widgets/incident_card.dart';
+import 'package:prasa_assist/shared/staff/staff_directory_repository.dart';
+import 'package:prasa_assist/shared/staff/staff_profile.dart';
 
 void main() {
   testWidgets('is a normal page and loads labelled demonstration data', (
@@ -186,6 +188,23 @@ void main() {
     expect(openedIncident?.incidentId, 'INC-20260828-001');
   });
 
+  testWidgets('report form resolves the current label from full directory', (
+    tester,
+  ) async {
+    await _pumpPage(
+      tester,
+      staffDirectoryRepository: _IncidentDirectoryFake(),
+      currentUserId: _staffUserId,
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('report-incident-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Operations Staff (O-001)'), findsOneWidget);
+    expect(find.textContaining(_staffUserId), findsNothing);
+  });
+
   testWidgets('remains overflow-free at 320px width', (tester) async {
     tester.view.physicalSize = const Size(320, 640);
     tester.view.devicePixelRatio = 1;
@@ -207,6 +226,8 @@ Future<void> _pumpPage(
   Iterable<Incident>? incidents,
   VoidCallback? onReportIncident,
   ValueChanged<Incident>? onOpenIncident,
+  StaffDirectoryRepository? staffDirectoryRepository,
+  String? currentUserId,
   bool finishLoading = true,
 }) async {
   final effectiveRepository =
@@ -224,6 +245,8 @@ Future<void> _pumpPage(
       theme: AppTheme.light,
       home: IncidentListPage(
         currentStaffId: 'staff-001',
+        currentUserId: currentUserId,
+        staffDirectoryRepository: staffDirectoryRepository,
         repository: effectiveRepository,
         onReportIncident: onReportIncident,
         onOpenIncident: onOpenIncident,
@@ -235,6 +258,36 @@ Future<void> _pumpPage(
     await tester.pump();
   }
 }
+
+class _IncidentDirectoryFake implements StaffDirectoryRepository {
+  @override
+  Future<StaffDirectorySnapshot> load() async => StaffDirectorySnapshot(
+    profiles: [
+      StaffProfile(
+        userId: _staffUserId,
+        staffCode: 'o-001',
+        displayName: 'Operations Staff',
+        role: StaffRole.operationsStaff,
+        active: true,
+        version: 1,
+      ),
+    ],
+    source: StaffDirectorySource.liveSupabase,
+    retrievedAt: DateTime.utc(2026, 9, 4),
+    isStale: false,
+  );
+
+  @override
+  Future<StaffDirectorySnapshot> loadAssignable() async =>
+      StaffDirectorySnapshot(
+        profiles: const [],
+        source: StaffDirectorySource.liveSupabase,
+        retrievedAt: DateTime.utc(2026, 9, 4),
+        isStale: false,
+      );
+}
+
+const _staffUserId = '22222222-2222-4222-8222-222222222222';
 
 Future<void> _finishQuery(WidgetTester tester) async {
   await tester.pump();

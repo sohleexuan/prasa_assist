@@ -180,7 +180,7 @@ class _RecommendationDetailPageState extends State<RecommendationDetailPage> {
                   ? 'Accepted'
                   : 'Rejected',
               body: Text(
-                'Decision by ${item.decisionUserId ?? 'staff'} at ${item.decisionAt == null ? 'recorded time' : MalaysiaTime.formatDateTime(item.decisionAt!)}${item.decisionNote == null ? '' : '\nNote: ${item.decisionNote}'}',
+                'Decision by ${widget.controller.decisionStaffLabel(item.decisionUserId)} at ${item.decisionAt == null ? 'recorded time' : MalaysiaTime.formatDateTime(item.decisionAt!)}${item.decisionNote == null ? '' : '\nNote: ${item.decisionNote}'}',
               ),
             ),
             if (item.status == RecommendationStatus.accepted) ...[

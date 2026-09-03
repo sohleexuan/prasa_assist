@@ -19,6 +19,8 @@ import 'package:prasa_assist/features/recommendations/repositories/recommendatio
 import 'package:prasa_assist/features/recommendations/widgets/recommendation_analysis_panel.dart';
 import 'package:prasa_assist/features/work_orders/models/work_order.dart';
 import 'package:prasa_assist/features/work_orders/models/work_order_prefill.dart';
+import 'package:prasa_assist/shared/staff/staff_directory_repository.dart';
+import 'package:prasa_assist/shared/staff/staff_profile.dart';
 
 void main() {
   testWidgets('analysis panel uses provider-neutral staff-decision wording', (
@@ -63,6 +65,21 @@ void main() {
     expect(controller.find('rec-1')?.analysis, isNotNull);
   });
 
+  test('decision identity resolves to approved staff label', () async {
+    final controller = RecommendationController(
+      _FixedRepository(_acceptedRecord()),
+      staffDirectoryRepository: _RecommendationStaffDirectoryFake(),
+    );
+    addTearDown(controller.dispose);
+
+    await controller.load();
+
+    expect(
+      controller.decisionStaffLabel('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+      'Supervisor One (S-001)',
+    );
+  });
+
   testWidgets('shows recommendation record times in Malaysia time', (
     tester,
   ) async {
@@ -87,6 +104,11 @@ void main() {
     await tester.drag(find.byType(ListView), const Offset(0, -900));
     await tester.pumpAndSettle();
     expect(find.textContaining('at 2026-08-29 09:00 MYT'), findsOneWidget);
+    expect(find.textContaining('Staff profile unavailable'), findsOneWidget);
+    expect(
+      find.textContaining('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+      findsNothing,
+    );
   });
 
   testWidgets(
@@ -419,6 +441,34 @@ class _FixedRepository implements RecommendationRepository {
     String? note,
     required int expectedVersion,
   }) async => record;
+}
+
+class _RecommendationStaffDirectoryFake implements StaffDirectoryRepository {
+  @override
+  Future<StaffDirectorySnapshot> load() async => StaffDirectorySnapshot(
+    profiles: [
+      StaffProfile(
+        userId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        staffCode: 'S-001',
+        displayName: 'Supervisor One',
+        role: StaffRole.supervisor,
+        active: true,
+        version: 1,
+      ),
+    ],
+    source: StaffDirectorySource.liveSupabase,
+    retrievedAt: DateTime.utc(2026, 9, 3),
+    isStale: false,
+  );
+
+  @override
+  Future<StaffDirectorySnapshot> loadAssignable() async =>
+      StaffDirectorySnapshot(
+        profiles: const [],
+        source: StaffDirectorySource.liveSupabase,
+        retrievedAt: DateTime.utc(2026, 9, 3),
+        isStale: false,
+      );
 }
 
 RecommendationRecordDto _acceptedRecord({

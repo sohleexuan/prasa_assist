@@ -228,6 +228,31 @@ void main() {
       expect(fixture.remote.expectedVersion, 3);
     });
 
+    test(
+      'assigns through stable staff UUID and stores server snapshot',
+      () async {
+        final fixture = _Fixture();
+        fixture.remote.records = [
+          _confirmed(
+            scheduledStart: DateTime.utc(2026, 9, 3, 1),
+            scheduledEnd: DateTime.utc(2026, 9, 3, 2),
+          ),
+        ];
+
+        final assigned = await fixture.repository.assignConfirmed(
+          'WO-0001',
+          assignedToUserId: '44444444-4444-4444-8444-444444444444',
+          expectedVersion: 2,
+        );
+
+        expect(
+          fixture.remote.assignedToUserId,
+          '44444444-4444-4444-8444-444444444444',
+        );
+        expect(assigned.assignedToLabelSnapshot, 'Maintenance Staff (M-001)');
+      },
+    );
+
     test('legacy equality record can be cancelled and hydrated', () async {
       final fixture = _Fixture();
       final instant = DateTime.utc(2026, 9, 2, 1);
@@ -283,6 +308,7 @@ class _FakeRemote implements WorkOrderRemoteDataSource {
   WorkOrderUpdateInput? updatedInput;
   WorkOrderStatus? toStatus;
   int? expectedVersion;
+  String? assignedToUserId;
   int createCalls = 0;
   int transitionCalls = 0;
 
@@ -324,11 +350,17 @@ class _FakeRemote implements WorkOrderRemoteDataSource {
   @override
   Future<WorkOrderRecordDto> assign(
     String workOrderId, {
-    required String assignedTo,
+    required String assignedToUserId,
     required int expectedVersion,
   }) async {
     this.expectedVersion = expectedVersion;
-    return _confirmed(status: WorkOrderStatus.assigned, assignedTo: assignedTo);
+    this.assignedToUserId = assignedToUserId;
+    return _confirmed(
+      status: WorkOrderStatus.assigned,
+      assignedTo: 'Maintenance Staff (M-001)',
+      assignedToUserId: assignedToUserId,
+      assignedToLabelSnapshot: 'Maintenance Staff (M-001)',
+    );
   }
 
   @override
@@ -506,6 +538,8 @@ LocalWorkOrderRecord _cached(
   remoteStorageId: dto.storageId,
   workOrderId: dto.workOrderId,
   assignedTo: dto.assignedTo,
+  assignedToUserId: dto.assignedToUserId,
+  assignedToLabelSnapshot: dto.assignedToLabelSnapshot,
   remoteCreatedAt: dto.createdAt,
   remoteUpdatedAt: dto.updatedAt,
   completedAt: dto.completedAt,
@@ -519,6 +553,8 @@ LocalWorkOrderRecord _cached(
 WorkOrderRecordDto _confirmed({
   WorkOrderStatus status = WorkOrderStatus.open,
   String? assignedTo,
+  String? assignedToUserId,
+  String? assignedToLabelSnapshot,
   int version = 2,
   DateTime? scheduledStart,
   DateTime? scheduledEnd,
@@ -534,6 +570,8 @@ WorkOrderRecordDto _confirmed({
   description: 'Inspect Bus B1023 after its Route 300 breakdown.',
   priority: WorkOrderPriority.urgent,
   assignedTo: assignedTo,
+  assignedToUserId: assignedToUserId,
+  assignedToLabelSnapshot: assignedToLabelSnapshot,
   scheduledStart: scheduledStart,
   scheduledEnd: scheduledEnd,
   status: status,

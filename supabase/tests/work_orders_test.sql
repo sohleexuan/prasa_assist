@@ -3,6 +3,49 @@ create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions,pg_catalog;
 select no_plan();
 
+insert into auth.users(id) values
+  ('11111111-1111-4111-8111-111111111111'),
+  ('22222222-2222-4222-8222-222222222222'),
+  ('33333333-3333-4333-8333-333333333333'),
+  ('44444444-4444-4444-8444-444444444444'),
+  ('55555555-5555-4555-8555-555555555555'),
+  ('66666666-6666-4666-8666-666666666666'),
+  ('77777777-7777-4777-8777-777777777777')
+on conflict (id) do nothing;
+insert into public.staff_profiles(
+  user_id, staff_code, display_name, role, active
+) values
+  ('11111111-1111-4111-8111-111111111111','s-001','Supervisor One','supervisor',true),
+  ('22222222-2222-4222-8222-222222222222','C-001','Controller One','control_centre',true),
+  ('33333333-3333-4333-8333-333333333333','M-001','Maintenance One','maintenance_staff',true),
+  ('44444444-4444-4444-8444-444444444444','M-002','Inactive Maintenance','maintenance_staff',false),
+  ('55555555-5555-4555-8555-555555555555','O-001','Operations One','operations_staff',true)
+on conflict (user_id) do nothing;
+
+select has_table('public','staff_profiles','staff profile directory exists');
+select hasnt_column('public','staff_profiles','email','directory stores no email');
+select ok((select relrowsecurity from pg_class where oid='public.staff_profiles'::regclass),'staff directory RLS is enabled');
+select ok(not has_table_privilege('authenticated','public.staff_profiles','SELECT'),'authenticated has no direct profile SELECT');
+select ok(not has_table_privilege('authenticated','public.staff_profiles','INSERT'),'authenticated has no direct profile INSERT');
+select ok(not has_table_privilege('authenticated','public.staff_profiles','UPDATE'),'authenticated has no direct profile UPDATE');
+select ok(not has_table_privilege('authenticated','public.staff_profiles','DELETE'),'authenticated has no direct profile DELETE');
+select ok(not has_function_privilege('anon','public.list_staff_directory()','EXECUTE'),'anonymous cannot execute directory RPC');
+select ok(not has_function_privilege('authenticated','public.enforce_staff_profile_write()','EXECUTE'),'profile trigger helper is not client-callable');
+select is((select staff_code from public.staff_profiles where user_id='11111111-1111-4111-8111-111111111111'),'S-001','PostgreSQL canonicalizes staff codes to uppercase');
+select throws_ok($$insert into public.staff_profiles(user_id,staff_code,display_name,role) values('66666666-6666-4666-8666-666666666666','s-001','Duplicate Code','operations_staff')$$,'23505',null,'case-variant duplicate staff code is rejected');
+set local role service_role;
+select throws_ok($$insert into public.staff_profiles(user_id,staff_code,display_name,role) values('77777777-7777-4777-8777-777777777777','P-001','Provisioning Probe','operations_staff')$$,'42501',null,'service role cannot provision staff profiles directly');
+reset role;
+select lives_ok($$insert into public.staff_profiles(user_id,staff_code,display_name,role,active) values('77777777-7777-4777-8777-777777777777',' p-001 ','Provisioning Probe','operations_staff',false)$$,'PostgreSQL owner can provision a staff profile');
+select is((select staff_code from public.staff_profiles where user_id='77777777-7777-4777-8777-777777777777'),'P-001','owner provisioning stores the canonical uppercase staff code');
+select throws_ok($$insert into public.staff_profiles(user_id,staff_code,display_name,role) values('66666666-6666-4666-8666-666666666666',' ','Blank Code','operations_staff')$$,'23514',null,'blank staff code is rejected');
+select throws_ok($$insert into public.staff_profiles(user_id,staff_code,display_name,role) values('66666666-6666-4666-8666-666666666666','T-001',' ','operations_staff')$$,'23514',null,'blank display name is rejected');
+select throws_ok($$insert into public.staff_profiles(user_id,staff_code,display_name,role) values('66666666-6666-4666-8666-666666666666','T-001','Test Staff','administrator')$$,'23514',null,'unknown staff role is rejected');
+select is((select version from public.staff_profiles where user_id='44444444-4444-4444-8444-444444444444'),1::bigint,'profile version starts at one');
+select throws_ok($$update public.staff_profiles set version=99 where user_id='44444444-4444-4444-8444-444444444444'$$,'22023','Staff profile version and update time are database controlled.','profile version cannot be client supplied');
+select lives_ok($$update public.staff_profiles set display_name='Inactive Maintenance Updated' where user_id='44444444-4444-4444-8444-444444444444'$$,'controlled profile updates are accepted');
+select is((select version from public.staff_profiles where user_id='44444444-4444-4444-8444-444444444444'),2::bigint,'profile update increments the database version');
+
 select has_table('public','work_orders','work_orders table exists');
 select has_sequence('public','work_order_code_seq','six-digit allocation sequence exists');
 select col_is_pk('public','work_orders','id','storage UUID is primary key');
@@ -23,18 +66,55 @@ select ok(not has_sequence_privilege('authenticated','public.work_order_code_seq
 select function_returns('public','create_work_order',array['text','jsonb'],'jsonb','create RPC returns DTO JSON');
 select function_returns('public','update_work_order',array['text','jsonb','bigint'],'jsonb','update RPC returns DTO JSON');
 select function_returns('public','assign_work_order',array['text','text','bigint'],'jsonb','assignment RPC returns DTO JSON');
+select function_returns('public','assign_work_order_to_staff',array['text','uuid','bigint'],'jsonb','verified assignment RPC returns DTO JSON');
+select is((select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='assign_work_order'),1::bigint,'legacy assignment RPC has one unambiguous PostgREST signature');
+select is((select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='assign_work_order_to_staff'),1::bigint,'verified assignment RPC has one unambiguous PostgREST signature');
 select function_returns('public','transition_work_order',array['text','text','bigint'],'jsonb','transition RPC returns DTO JSON');
 select ok(not exists(select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname~*'delete.*work_order|work_order.*delete'),'no delete RPC exists');
 select ok(exists(select 1 from pg_trigger where tgrelid='public.work_orders'::regclass and tgname='enforce_work_order_schedule_integrity' and tgenabled='O'),'lifecycle-aware schedule trigger is enabled');
 select ok(not has_function_privilege('authenticated','public.enforce_work_order_schedule_integrity()','EXECUTE'),'schedule trigger function is not client-callable');
+select ok(not has_function_privilege('authenticated','public.work_order_result(public.work_orders)','EXECUTE'),'DTO helper is not client-callable');
+select ok(
+  not exists (
+    select 1
+    from pg_catalog.pg_proc p
+    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+    cross join lateral pg_catalog.aclexplode(
+      coalesce(
+        p.proacl,
+        pg_catalog.acldefault('f', p.proowner)
+      )
+    ) privilege
+    where n.nspname = 'public'
+      and p.proname in (
+        'enforce_staff_profile_write',
+        'enforce_work_order_schedule_integrity',
+        'enforce_work_order_update',
+        'work_order_result'
+      )
+      and privilege.grantee = 0
+      and privilege.privilege_type = 'EXECUTE'
+  ),
+  'trigger and result helpers have no PUBLIC execution privilege'
+);
 
-select ok((select bool_and(p.prosecdef and p.proconfig@>array['search_path=""']) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('create_work_order','update_work_order','assign_work_order','transition_work_order')),'all write RPCs are SECURITY DEFINER with empty search_path');
-select ok((select bool_and(pg_get_functiondef(p.oid)!~'[^.]\m(work_orders|work_order_code_seq)\M' and pg_get_functiondef(p.oid)!~'[^.]\m(uid|jwt|digest)\s*\(') from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('create_work_order','update_work_order','assign_work_order','transition_work_order')),'SECURITY DEFINER protected references are schema-qualified');
-select ok((select bool_and(pg_get_functiondef(p.oid)!~*'\mexecute\M') from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('create_work_order','update_work_order','assign_work_order','transition_work_order')),'write RPCs contain no dynamic SQL');
+select ok((select bool_and(p.prosecdef and p.proconfig@>array['search_path=""']) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('create_work_order','update_work_order','assign_work_order','assign_work_order_to_staff','transition_work_order')),'all write RPCs are SECURITY DEFINER with empty search_path');
+select ok((select bool_and(pg_get_functiondef(p.oid)!~'[^.]\m(work_orders|staff_profiles|work_order_code_seq)\M' and pg_get_functiondef(p.oid)!~'[^.]\m(uid|jwt|digest)\s*\(') from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('create_work_order','update_work_order','assign_work_order','assign_work_order_to_staff','transition_work_order')),'SECURITY DEFINER protected references are schema-qualified');
+select ok((select bool_and(pg_get_functiondef(p.oid)!~*'\mexecute\M') from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('create_work_order','update_work_order','assign_work_order','assign_work_order_to_staff','transition_work_order')),'write RPCs contain no dynamic SQL');
 
 select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',true);
 select set_config('request.jwt.claims','{"sub":"11111111-1111-4111-8111-111111111111","email":"staff.one@example.com","role":"authenticated"}',true);
 set local role authenticated;
+select lives_ok($$select * from public.list_staff_directory()$$,'active authenticated staff can query the directory RPC');
+select is((select count(*) from public.list_staff_directory()),4::bigint,'directory returns active staff only');
+select is((select count(*) from public.list_assignable_staff()),1::bigint,'assignable directory returns active maintenance staff only');
+select set_config('request.jwt.claim.sub','44444444-4444-4444-8444-444444444444',true);
+select set_config('request.jwt.claims','{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}',true);
+select throws_ok($$select * from public.list_staff_directory()$$,'42501','An active authenticated staff profile is required.','inactive staff cannot query the full directory');
+select throws_ok($$select * from public.list_assignable_staff()$$,'42501','An active authenticated staff profile is required.','inactive staff cannot query the assignable directory');
+select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',true);
+select set_config('request.jwt.claims','{"sub":"11111111-1111-4111-8111-111111111111","email":"staff.one@example.com","role":"authenticated"}',true);
+select throws_ok($$update public.staff_profiles set display_name='Spoofed' where user_id='33333333-3333-4333-8333-333333333333'$$,'42501',null,'authenticated direct staff profile writes are denied');
 select lives_ok($$select count(*) from public.work_orders$$,'authenticated operations staff can read shared confirmed work orders');
 select throws_ok($$select publication_key from public.work_orders$$,'42501',null,'authenticated staff cannot retrieve publication key');
 select throws_ok($$select publication_request_snapshot from public.work_orders$$,'42501',null,'authenticated staff cannot retrieve publication snapshot');
@@ -70,7 +150,7 @@ set local role authenticated;
 select is((public.create_work_order('local-b1023','{"incident_id":"INC-B1023-ROUTE-300","recommendation_id":"REC-INSPECT-B1023","route_id":"300","vehicle_id":"B1023","task_type":"Inspection","description":"Inspect Bus B1023 after its Route 300 breakdown.","priority":"urgent","scheduled_start":"2026-08-30T00:00:00Z","scheduled_end":"2026-08-30T01:00:00Z","notes":"AI recommends. Staff decides."}'::jsonb)->>'work_order_id'),(select work_order_id from public.work_orders where description='Inspect Bus B1023 after its Route 300 breakdown.'),'same canonical publication returns the same work order');
 select throws_ok($$select public.create_work_order('local-b1023','{"vehicle_id":"B9999","task_type":"Inspection","description":"Different","priority":"urgent"}'::jsonb)$$,'40001','Publication key was already used for different content.','same publication key cannot represent different content');
 select lives_ok($$select public.transition_work_order((select work_order_id from public.work_orders where description='Inspect Bus B1023 after its Route 300 breakdown.'),'open',1)$$,'scheduled Draft can become Open');
-select lives_ok($$select public.assign_work_order((select work_order_id from public.work_orders where description='Inspect Bus B1023 after its Route 300 breakdown.'),'Technician A',2)$$,'Open can be explicitly assigned');
+select lives_ok($$select public.assign_work_order_to_staff((select work_order_id from public.work_orders where description='Inspect Bus B1023 after its Route 300 breakdown.'),'33333333-3333-4333-8333-333333333333',2)$$,'Open can be explicitly assigned to verified maintenance staff');
 select lives_ok($$select public.transition_work_order((select work_order_id from public.work_orders where description='Inspect Bus B1023 after its Route 300 breakdown.'),'in_progress',3)$$,'Assigned can start');
 select lives_ok($$select public.transition_work_order((select work_order_id from public.work_orders where description='Inspect Bus B1023 after its Route 300 breakdown.'),'completed',4)$$,'In Progress can complete');
 select throws_ok($$select public.transition_work_order((select work_order_id from public.work_orders where description='Inspect Bus B1023 after its Route 300 breakdown.'),'cancelled',5)$$,'22023','Invalid work-order status transition.','Completed is terminal');
@@ -97,6 +177,7 @@ select throws_ok($$select * from public.work_orders$$,'42501',null,'wildcard SEL
 select lives_ok($$select work_order_id from public.work_orders where description='Inspect Bus B1023 after its Route 300 breakdown.'$$,'second authenticated staff member can read another creator work order');
 reset role;
 set local role anon;
+select throws_ok($$select * from public.list_staff_directory()$$,'42501',null,'anonymous directory access is denied');
 select throws_ok($$select count(*) from public.work_orders$$,'42501',null,'anonymous read is denied');
 select throws_ok($$select public.create_work_order('anon-test','{"vehicle_id":"B1023","task_type":"Inspection","description":"Anon","priority":"low"}'::jsonb)$$,'42501',null,'anonymous create is denied');
 select throws_ok($$select public.update_work_order('missing','{}'::jsonb,1)$$,'42501',null,'anonymous update is denied');
@@ -267,7 +348,7 @@ select throws_ok(
   'P0002','Work order was not found.','update reports not-found safely'
 );
 select throws_ok(
-  $$select public.assign_work_order('WO-NOT-FOUND','Technician A',1)$$,
+  $$select public.assign_work_order_to_staff('WO-NOT-FOUND','33333333-3333-4333-8333-333333333333',1)$$,
   'P0002','Work order was not found.','assignment reports not-found safely'
 );
 select throws_ok(
@@ -323,26 +404,49 @@ set local role authenticated;
 
 select lives_ok($$select public.create_work_order('assign-open','{"vehicle_id":"B1023","task_type":"Inspection","description":"Assignment record","priority":"high","scheduled_start":"2026-08-30T08:00:00Z","scheduled_end":"2026-08-30T09:00:00Z"}'::jsonb)$$,'creates assignment record');
 select lives_ok($$select public.transition_work_order((select work_order_id from public.work_orders where description='Assignment record'),'open',1)$$,'opens assignment record');
-select throws_ok($$select public.assign_work_order((select work_order_id from public.work_orders where description='Assignment record'),' ',2)$$,'22023','Assignment input is invalid.','blank assignment is rejected');
-select throws_ok($$select public.assign_work_order((select work_order_id from public.work_orders where description='Assignment record'),'Technician A',1)$$,'40001','Work order changed. Refresh before assigning.','stale expectedVersion rejects assignment');
-select lives_ok($$select public.assign_work_order((select work_order_id from public.work_orders where description='Assignment record'),'Technician A',2)$$,'Open record can be assigned once');
-select throws_ok($$select public.assign_work_order((select work_order_id from public.work_orders where description='Assignment record'),'Technician B',3)$$,'22023','Only an unassigned Open work order can be assigned.','reassignment is rejected');
+select throws_ok($$select public.assign_work_order((select work_order_id from public.work_orders where description='Assignment record'),'Legacy free text',2)$$,'0A000','Free-text assignment is disabled. Upgrade and use assign_work_order_to_staff.','legacy assignment signature fails closed');
+select throws_ok($$select public.assign_work_order_to_staff((select work_order_id from public.work_orders where description='Assignment record'),null,2)$$,'22023','Assignment input is invalid.','null assignment is rejected');
+select throws_ok($$select public.assign_work_order_to_staff((select work_order_id from public.work_orders where description='Assignment record'),'44444444-4444-4444-8444-444444444444',2)$$,'22023','The selected assignee is not active maintenance staff.','inactive maintenance staff is rejected');
+select throws_ok($$select public.assign_work_order_to_staff((select work_order_id from public.work_orders where description='Assignment record'),'55555555-5555-4555-8555-555555555555',2)$$,'22023','The selected assignee is not active maintenance staff.','wrong-role assignee is rejected');
+select set_config('request.jwt.claim.sub','55555555-5555-4555-8555-555555555555',true);
+select set_config('request.jwt.claims','{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}',true);
+select throws_ok($$select public.assign_work_order_to_staff((select work_order_id from public.work_orders where description='Assignment record'),'33333333-3333-4333-8333-333333333333',2)$$,'42501','Only active supervisors or control-centre staff can assign work orders.','operations staff cannot assign');
+select set_config('request.jwt.claim.sub','44444444-4444-4444-8444-444444444444',true);
+select set_config('request.jwt.claims','{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}',true);
+select throws_ok($$select public.assign_work_order_to_staff((select work_order_id from public.work_orders where description='Assignment record'),'33333333-3333-4333-8333-333333333333',2)$$,'42501','Only active supervisors or control-centre staff can assign work orders.','inactive staff cannot assign');
+select set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222',true);
+select set_config('request.jwt.claims','{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}',true);
+select throws_ok($$select public.assign_work_order_to_staff((select work_order_id from public.work_orders where description='Assignment record'),'33333333-3333-4333-8333-333333333333',1)$$,'40001','Work order changed. Refresh before assigning.','stale expectedVersion rejects assignment');
+select lives_ok($$select public.assign_work_order_to_staff((select work_order_id from public.work_orders where description='Assignment record'),'33333333-3333-4333-8333-333333333333',2)$$,'Open record can be assigned once');
+select throws_ok($$select public.assign_work_order_to_staff((select work_order_id from public.work_orders where description='Assignment record'),'33333333-3333-4333-8333-333333333333',3)$$,'22023','Only an unassigned Open work order can be assigned.','reassignment is rejected');
 select throws_ok($$select public.update_work_order((select work_order_id from public.work_orders where description='Assignment record'),'{"vehicle_id":"B1023","task_type":"Inspection","description":"Clear Assigned schedule","priority":"high"}'::jsonb,3)$$,'22023','This status requires a schedule.','Assigned work order cannot clear its schedule');
 select lives_ok($$select public.transition_work_order((select work_order_id from public.work_orders where description='Assignment record'),'in_progress',3)$$,'assigned record starts through stored status');
 select throws_ok($$select public.update_work_order((select work_order_id from public.work_orders where description='Assignment record'),'{"vehicle_id":"B1023","task_type":"Inspection","description":"Clear In Progress schedule","priority":"high"}'::jsonb,4)$$,'22023','This status requires a schedule.','In Progress work order cannot clear its schedule');
-select throws_ok($$select public.assign_work_order((select work_order_id from public.work_orders where description='Assignment record'),'Technician C',4)$$,'22023','Only an unassigned Open work order can be assigned.','assignment from non-Open status is rejected');
+select throws_ok($$select public.assign_work_order_to_staff((select work_order_id from public.work_orders where description='Assignment record'),'33333333-3333-4333-8333-333333333333',4)$$,'22023','Only an unassigned Open work order can be assigned.','assignment from non-Open status is rejected');
 select throws_ok($$select public.transition_work_order((select work_order_id from public.work_orders where description='Update conflict record'),'assigned',2)$$,'22023','Status transition input is invalid.','Open to Assigned cannot use the transition RPC');
 select throws_ok($$select public.transition_work_order((select work_order_id from public.work_orders where description='Update conflict record'),'in_progress',2)$$,'22023','Invalid work-order status transition.','transition decision uses stored database status');
 select throws_ok($$select public.transition_work_order((select work_order_id from public.work_orders where description='Update conflict record'),'cancelled',1)$$,'40001','Work order changed. Refresh before continuing.','stale expectedVersion rejects transition');
 reset role;
-select ok((select status='in_progress' and version=4 and assigned_to='Technician A' from public.work_orders where publication_key='assign-open'),'rejected assignment and lifecycle operations leave the stored row unchanged');
+insert into public.work_orders(work_order_id,publication_key,publication_request_snapshot,publication_request_sha256,vehicle_id,task_type,description,priority,assigned_to,scheduled_start,scheduled_end,status,created_by_user_id,created_by_label,created_at,updated_at,version) values
+  ('WO-20260830-999991','legacy-assigned-lifecycle','{}'::jsonb,extensions.digest('legacy-assigned-lifecycle','sha256'),'B1023','Inspection','Legacy Assigned lifecycle','high','Historical staff label','2026-08-30T08:00:00Z','2026-08-30T09:00:00Z','assigned','11111111-1111-4111-8111-111111111111','Historical creator','2026-08-30T07:00:00Z','2026-08-30T07:00:00Z',1),
+  ('WO-20260830-999992','legacy-in-progress-complete','{}'::jsonb,extensions.digest('legacy-in-progress-complete','sha256'),'B1023','Inspection','Legacy In Progress completion','high','Historical staff label','2026-08-30T08:00:00Z','2026-08-30T09:00:00Z','in_progress','11111111-1111-4111-8111-111111111111','Historical creator','2026-08-30T07:00:00Z','2026-08-30T07:00:00Z',1),
+  ('WO-20260830-999993','legacy-in-progress-cancel','{}'::jsonb,extensions.digest('legacy-in-progress-cancel','sha256'),'B1023','Inspection','Legacy In Progress cancellation','high','Historical staff label','2026-08-30T08:00:00Z','2026-08-30T09:00:00Z','in_progress','11111111-1111-4111-8111-111111111111','Historical creator','2026-08-30T07:00:00Z','2026-08-30T07:00:00Z',1);
+set local role authenticated;
+select lives_ok($$select public.transition_work_order('WO-20260830-999991','in_progress',1)$$,'legacy Assigned row with text-only assignment can continue lifecycle');
+select lives_ok($$select public.transition_work_order('WO-20260830-999992','completed',1)$$,'legacy In Progress row can complete');
+select lives_ok($$select public.transition_work_order('WO-20260830-999993','cancelled',1)$$,'legacy In Progress row can cancel');
+reset role;
+select ok((select status='in_progress' and assigned_to_user_id is null and assigned_to_label_snapshot is null from public.work_orders where publication_key='legacy-assigned-lifecycle'),'legacy Assigned transition preserves its unverified text-only assignment');
+select ok((select status='completed' and completed_at=updated_at from public.work_orders where publication_key='legacy-in-progress-complete'),'legacy In Progress completion keeps lifecycle timestamps valid');
+select ok((select status='cancelled' and cancelled_at=updated_at from public.work_orders where publication_key='legacy-in-progress-cancel'),'legacy In Progress cancellation keeps lifecycle timestamps valid');
+select ok((select status='in_progress' and version=4 and assigned_to='Maintenance One (M-001)' and assigned_to_user_id='33333333-3333-4333-8333-333333333333'::uuid and assigned_to_label_snapshot='Maintenance One (M-001)' from public.work_orders where publication_key='assign-open'),'verified assignment snapshot and lifecycle operations leave the stored row unchanged');
 set local role authenticated;
 
 select lives_ok($$select public.transition_work_order((select work_order_id from public.work_orders where description='UUID label fallback'),'cancelled',1)$$,'unscheduled Draft can be cancelled');
 select lives_ok($$select public.transition_work_order((select work_order_id from public.work_orders where description='Update conflict record'),'cancelled',2)$$,'Open work order can be cancelled');
 select lives_ok($$select public.create_work_order('assigned-cancel','{"vehicle_id":"B1023","task_type":"Inspection","description":"Assigned cancellation","priority":"high","scheduled_start":"2026-08-30T08:00:00Z","scheduled_end":"2026-08-30T09:00:00Z"}'::jsonb)$$,'creates Assigned cancellation record');
 select lives_ok($$select public.transition_work_order((select work_order_id from public.work_orders where description='Assigned cancellation'),'open',1)$$,'opens Assigned cancellation record');
-select lives_ok($$select public.assign_work_order((select work_order_id from public.work_orders where description='Assigned cancellation'),'Technician A',2)$$,'assigns cancellation record');
+select lives_ok($$select public.assign_work_order_to_staff((select work_order_id from public.work_orders where description='Assigned cancellation'),'33333333-3333-4333-8333-333333333333',2)$$,'assigns cancellation record');
 select lives_ok($$select public.transition_work_order((select work_order_id from public.work_orders where description='Assigned cancellation'),'cancelled',3)$$,'Assigned work order can be cancelled');
 select lives_ok($$select public.transition_work_order((select work_order_id from public.work_orders where description='Assignment record'),'cancelled',4)$$,'In Progress work order can be cancelled');
 reset role;

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prasa_assist/core/theme/app_theme.dart';
 import 'package:prasa_assist/core/database/local_sync_state.dart';
@@ -10,6 +13,9 @@ import 'package:prasa_assist/features/work_orders/models/work_order.dart';
 import 'package:prasa_assist/features/work_orders/models/work_order_read_result.dart';
 import 'package:prasa_assist/features/work_orders/pages/work_order_detail_page.dart';
 import 'package:prasa_assist/features/work_orders/repositories/work_order_hybrid_operations.dart';
+import 'package:prasa_assist/shared/staff/staff_directory_repository.dart';
+import 'package:prasa_assist/shared/staff/staff_directory_exception.dart';
+import 'package:prasa_assist/shared/staff/staff_profile.dart';
 
 void main() {
   final now = DateTime.utc(2026, 8, 27, 1);
@@ -157,6 +163,8 @@ void main() {
       InMemoryWorkOrderRepository(
         initialWorkOrders: [record(status: WorkOrderStatus.open)],
       ),
+      staffDirectoryRepository: _StaffDirectoryFake(),
+      currentUserId: _supervisorUserId,
     );
     addTearDown(controller.dispose);
     await controller.load();
@@ -172,21 +180,245 @@ void main() {
 
     await tester.tap(find.byKey(const Key('assignWorkOrderAction')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('confirmAssignmentAction')));
+    expect(find.byKey(const Key('assignedToField')), findsNothing);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const Key('confirmAssignmentAction')),
+          )
+          .onPressed,
+      isNull,
+    );
+    await tester.tap(find.text('Staff B (M-002)'));
     await tester.pump();
-    expect(find.text('Responsible staff is required.'), findsOneWidget);
-
-    await tester.enterText(
-      find.byKey(const Key('assignedToField')),
-      ' Staff B ',
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const Key('confirmAssignmentAction')),
+          )
+          .onPressed,
+      isNotNull,
     );
     await tester.tap(find.byKey(const Key('confirmAssignmentAction')));
     await tester.pumpAndSettle();
-    expect(controller.findById('WO-DEMO-001')?.assignedTo, 'Staff B');
+    expect(controller.findById('WO-DEMO-001')?.assignedTo, 'Staff B (M-002)');
+    expect(
+      controller.findById('WO-DEMO-001')?.assignedToUserId,
+      '22222222-2222-4222-8222-222222222222',
+    );
     expect(
       controller.findById('WO-DEMO-001')?.status,
       WorkOrderStatus.assigned,
     );
+  });
+
+  testWidgets('legacy assignment is retained without trusting its identity', (
+    tester,
+  ) async {
+    final controller = WorkOrdersController(
+      InMemoryWorkOrderRepository(
+        initialWorkOrders: [record(status: WorkOrderStatus.assigned)],
+      ),
+    );
+    addTearDown(controller.dispose);
+    await controller.load();
+
+    await tester.pumpWidget(
+      _TestHost(
+        child: WorkOrderDetailPage(
+          controller: controller,
+          workOrderId: 'WO-DEMO-001',
+        ),
+      ),
+    );
+
+    expect(find.text('Legacy assignment — unverified'), findsOneWidget);
+    expect(find.text('Staff B'), findsNothing);
+  });
+
+  testWidgets('assignment selector shows empty and retry state', (
+    tester,
+  ) async {
+    final controller = WorkOrdersController(
+      InMemoryWorkOrderRepository(
+        initialWorkOrders: [record(status: WorkOrderStatus.open)],
+      ),
+      staffDirectoryRepository: _EmptyStaffDirectoryFake(),
+      currentUserId: _supervisorUserId,
+    );
+    addTearDown(controller.dispose);
+    await controller.load();
+    await tester.pumpWidget(
+      _TestHost(
+        child: WorkOrderDetailPage(
+          controller: controller,
+          workOrderId: 'WO-DEMO-001',
+        ),
+      ),
+    );
+    await _scrollToActions(tester);
+    await tester.tap(find.byKey(const Key('assignWorkOrderAction')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('staffDirectoryEmpty')), findsOneWidget);
+    expect(find.byKey(const Key('retryStaffDirectory')), findsOneWidget);
+  });
+
+  testWidgets('assignment selector identifies stale offline cache', (
+    tester,
+  ) async {
+    final controller = WorkOrdersController(
+      InMemoryWorkOrderRepository(
+        initialWorkOrders: [record(status: WorkOrderStatus.open)],
+      ),
+      staffDirectoryRepository: _CachedStaffDirectoryFake(),
+      currentUserId: _supervisorUserId,
+    );
+    addTearDown(controller.dispose);
+    await controller.load();
+    await tester.pumpWidget(
+      _TestHost(
+        child: WorkOrderDetailPage(
+          controller: controller,
+          workOrderId: 'WO-DEMO-001',
+        ),
+      ),
+    );
+    await _scrollToActions(tester);
+    await tester.tap(find.byKey(const Key('assignWorkOrderAction')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('staffDirectoryCachedNotice')), findsOneWidget);
+    expect(find.textContaining('may be out of date'), findsOneWidget);
+  });
+
+  testWidgets('assignment selector shows safe error and retry action', (
+    tester,
+  ) async {
+    final controller = WorkOrdersController(
+      InMemoryWorkOrderRepository(
+        initialWorkOrders: [record(status: WorkOrderStatus.open)],
+      ),
+      staffDirectoryRepository: _FailingStaffDirectoryFake(),
+      currentUserId: _supervisorUserId,
+    );
+    addTearDown(controller.dispose);
+    await controller.load();
+    await tester.pumpWidget(
+      _TestHost(
+        child: WorkOrderDetailPage(
+          controller: controller,
+          workOrderId: 'WO-DEMO-001',
+        ),
+      ),
+    );
+    await _scrollToActions(tester);
+    await tester.tap(find.byKey(const Key('assignWorkOrderAction')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('staffDirectoryError')), findsOneWidget);
+    expect(find.byKey(const Key('retryStaffDirectory')), findsOneWidget);
+  });
+
+  testWidgets('assignment selector exposes loading while retry is pending', (
+    tester,
+  ) async {
+    final directory = _DelayedRetryStaffDirectoryFake();
+    final controller = WorkOrdersController(
+      InMemoryWorkOrderRepository(
+        initialWorkOrders: [record(status: WorkOrderStatus.open)],
+      ),
+      staffDirectoryRepository: directory,
+      currentUserId: _supervisorUserId,
+    );
+    addTearDown(controller.dispose);
+    await controller.load();
+    await tester.pumpWidget(
+      _TestHost(
+        child: WorkOrderDetailPage(
+          controller: controller,
+          workOrderId: 'WO-DEMO-001',
+        ),
+      ),
+    );
+    await _scrollToActions(tester);
+    await tester.tap(find.byKey(const Key('assignWorkOrderAction')));
+    await tester.pump();
+
+    expect(find.byKey(const Key('staffDirectoryLoading')), findsOneWidget);
+    directory.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('Staff B (M-002)'), findsOneWidget);
+  });
+
+  testWidgets('assignment action is disabled for an unauthorized profile', (
+    tester,
+  ) async {
+    final controller = WorkOrdersController(
+      InMemoryWorkOrderRepository(
+        initialWorkOrders: [record(status: WorkOrderStatus.open)],
+      ),
+      staffDirectoryRepository: _UnauthorizedStaffDirectoryFake(),
+      currentUserId: _operationsUserId,
+    );
+    addTearDown(controller.dispose);
+    await controller.load();
+    await tester.pumpWidget(
+      _TestHost(
+        child: WorkOrderDetailPage(
+          controller: controller,
+          workOrderId: 'WO-DEMO-001',
+        ),
+      ),
+    );
+    await _scrollToActions(tester);
+
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('assignWorkOrderAction')))
+          .onPressed,
+      isNull,
+    );
+    expect(
+      find.text(
+        'Only active supervisors or control-centre staff can assign work orders.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('quick dialog dismissal is safe while directory load completes', (
+    tester,
+  ) async {
+    final directory = _DelayedRetryStaffDirectoryFake();
+    final controller = WorkOrdersController(
+      InMemoryWorkOrderRepository(
+        initialWorkOrders: [record(status: WorkOrderStatus.open)],
+      ),
+      staffDirectoryRepository: directory,
+      currentUserId: _supervisorUserId,
+    );
+    addTearDown(controller.dispose);
+    await controller.load();
+    await tester.pumpWidget(
+      _TestHost(
+        child: WorkOrderDetailPage(
+          controller: controller,
+          workOrderId: 'WO-DEMO-001',
+        ),
+      ),
+    );
+    await _scrollToActions(tester);
+    await tester.tap(find.byKey(const Key('assignWorkOrderAction')));
+    await tester.pump();
+    await tester.tap(find.text('Go back'));
+    await tester.pumpAndSettle();
+
+    directory.complete();
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(AlertDialog), findsNothing);
   });
 
   testWidgets('dismissed cancellation leaves the record unchanged', (
@@ -384,3 +616,125 @@ class _TestHost extends StatelessWidget {
     return MaterialApp(theme: AppTheme.light, home: child);
   }
 }
+
+class _StaffDirectoryFake implements StaffDirectoryRepository {
+  @override
+  Future<StaffDirectorySnapshot> load() async => StaffDirectorySnapshot(
+    profiles: [
+      _supervisorProfile,
+      StaffProfile(
+        userId: '22222222-2222-4222-8222-222222222222',
+        staffCode: 'M-002',
+        displayName: 'Staff B',
+        role: StaffRole.maintenanceStaff,
+        active: true,
+        version: 1,
+      ),
+    ],
+    source: StaffDirectorySource.liveSupabase,
+    retrievedAt: DateTime.utc(2026, 9, 3),
+    isStale: false,
+  );
+
+  @override
+  Future<StaffDirectorySnapshot> loadAssignable() async =>
+      StaffDirectorySnapshot(
+        profiles: [(await load()).profiles.last],
+        source: StaffDirectorySource.liveSupabase,
+        retrievedAt: DateTime.utc(2026, 9, 3),
+        isStale: false,
+      );
+}
+
+class _EmptyStaffDirectoryFake implements StaffDirectoryRepository {
+  @override
+  Future<StaffDirectorySnapshot> load() async => StaffDirectorySnapshot(
+    profiles: [_supervisorProfile],
+    source: StaffDirectorySource.liveSupabase,
+    retrievedAt: DateTime.utc(2026, 9, 3),
+    isStale: false,
+  );
+
+  @override
+  Future<StaffDirectorySnapshot> loadAssignable() async =>
+      StaffDirectorySnapshot(
+        profiles: const [],
+        source: StaffDirectorySource.liveSupabase,
+        retrievedAt: DateTime.utc(2026, 9, 3),
+        isStale: false,
+      );
+}
+
+class _CachedStaffDirectoryFake implements StaffDirectoryRepository {
+  @override
+  Future<StaffDirectorySnapshot> load() => _StaffDirectoryFake().load();
+
+  @override
+  Future<StaffDirectorySnapshot> loadAssignable() async =>
+      StaffDirectorySnapshot(
+        profiles: (await _StaffDirectoryFake().loadAssignable()).profiles,
+        source: StaffDirectorySource.cachedSqlite,
+        retrievedAt: DateTime.utc(2026, 9, 1),
+        isStale: true,
+      );
+}
+
+class _FailingStaffDirectoryFake implements StaffDirectoryRepository {
+  @override
+  Future<StaffDirectorySnapshot> load() => _StaffDirectoryFake().load();
+
+  @override
+  Future<StaffDirectorySnapshot> loadAssignable() =>
+      throw const StaffDirectoryOfflineException(
+        'The staff directory is unavailable and no offline cache exists.',
+      );
+}
+
+class _DelayedRetryStaffDirectoryFake implements StaffDirectoryRepository {
+  final _completer = Completer<StaffDirectorySnapshot>();
+
+  @override
+  Future<StaffDirectorySnapshot> load() => _StaffDirectoryFake().load();
+
+  @override
+  Future<StaffDirectorySnapshot> loadAssignable() => _completer.future;
+
+  void complete() async {
+    _completer.complete(await _StaffDirectoryFake().loadAssignable());
+  }
+}
+
+class _UnauthorizedStaffDirectoryFake implements StaffDirectoryRepository {
+  @override
+  Future<StaffDirectorySnapshot> load() async => StaffDirectorySnapshot(
+    profiles: [_operationsProfile],
+    source: StaffDirectorySource.liveSupabase,
+    retrievedAt: DateTime.utc(2026, 9, 3),
+    isStale: false,
+  );
+
+  @override
+  Future<StaffDirectorySnapshot> loadAssignable() =>
+      _StaffDirectoryFake().loadAssignable();
+}
+
+const _supervisorUserId = '33333333-3333-4333-8333-333333333333';
+const _operationsUserId = '55555555-5555-4555-8555-555555555555';
+
+final _supervisorProfile = StaffProfile(
+  userId: _supervisorUserId,
+  staffCode: 'S-001',
+  displayName: 'Supervisor One',
+  role: StaffRole.supervisor,
+  active: true,
+  version: 1,
+);
+
+final _operationsProfile = StaffProfile(
+  userId: _operationsUserId,
+  staffCode: 'O-001',
+  displayName: 'Operations One',
+  role: StaffRole.operationsStaff,
+  active: true,
+  version: 1,
+);

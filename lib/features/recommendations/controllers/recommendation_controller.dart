@@ -1,17 +1,22 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../shared/staff/staff_directory_exception.dart';
+import '../../../shared/staff/staff_directory_repository.dart';
+import '../../../shared/staff/staff_profile.dart';
 import '../data/dto/recommendation_record_dto.dart';
 import '../repositories/recommendation_data_exception.dart';
 import '../repositories/recommendation_repository.dart';
 
 class RecommendationController extends ChangeNotifier {
-  RecommendationController(this._repository);
+  RecommendationController(this._repository, {this.staffDirectoryRepository});
   final RecommendationRepository _repository;
+  final StaffDirectoryRepository? staffDirectoryRepository;
   List<RecommendationRecordDto> _records = const [];
   bool _loading = false;
   final Set<String> _busy = {};
   final Map<String, String> _analysisErrors = {};
   String? _error;
+  StaffDirectorySnapshot? _staffDirectory;
 
   List<RecommendationRecordDto> get records => List.unmodifiable(_records);
   bool get isLoading => _loading;
@@ -25,17 +30,32 @@ class RecommendationController extends ChangeNotifier {
     return null;
   }
 
+  String decisionStaffLabel(String? userId) =>
+      _staffDirectory?.findByUserId(userId)?.displayLabel ??
+      staffProfileUnavailableLabel;
+
   Future<void> load() async {
     _loading = true;
     _error = null;
     notifyListeners();
     try {
+      await _loadStaffDirectory();
       _records = await _repository.readAll();
     } on RecommendationDataException catch (error) {
       _error = error.safeMessage;
     } finally {
       _loading = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> _loadStaffDirectory() async {
+    final repository = staffDirectoryRepository;
+    if (repository == null) return;
+    try {
+      _staffDirectory = await repository.load();
+    } on StaffDirectoryException {
+      // Recommendation records remain usable with a neutral staff fallback.
     }
   }
 

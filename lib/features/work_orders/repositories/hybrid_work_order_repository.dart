@@ -194,13 +194,16 @@ class HybridWorkOrderRepository implements WorkOrderHybridOperations {
   @override
   Future<WorkOrder> assignConfirmed(
     String workOrderId, {
-    required String assignedTo,
+    required String assignedToUserId,
     required int expectedVersion,
   }) async {
     await _requireRemoteScheduleIntegrity(workOrderId);
     final updated = await _remoteDataSource.assign(
       _required(workOrderId, 'Work-order ID'),
-      assignedTo: _required(assignedTo, 'Responsible staff'),
+      assignedToUserId: _required(
+        assignedToUserId,
+        'Responsible staff identity',
+      ),
       expectedVersion: _version(expectedVersion),
     );
     await _refreshCache(<WorkOrderRecordDto>[updated], _now());

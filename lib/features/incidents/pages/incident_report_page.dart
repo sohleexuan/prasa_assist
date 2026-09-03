@@ -8,6 +8,7 @@ import '../../../core/time/malaysia_time.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
 import '../../../shared/widgets/app_section_card.dart';
 import '../../../shared/widgets/app_status_chip.dart';
+import '../../../shared/staff/staff_profile.dart';
 import '../controllers/incident_controller.dart';
 import '../data/dto/local_incident_draft.dart';
 import '../models/delay_estimate.dart';
@@ -229,7 +230,7 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
                               tone: AppStatusTone.neutral,
                             ),
                             Text(
-                              'Reporter: ${widget.existingIncident?.reportedBy ?? (widget.reportedBy.trim().isEmpty ? 'Unavailable' : widget.reportedBy.trim())}',
+                              'Reporter: ${_reporterLabel()}',
                               key: const ValueKey('incident-reporter-label'),
                             ),
                           ],
@@ -549,6 +550,12 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
     );
   }
 
+  String _reporterLabel() {
+    final reporter = widget.existingIncident?.reportedBy ?? widget.reportedBy;
+    if (reporter.trim().isEmpty) return 'Unavailable';
+    return safeStaffDisplayLabel(reporter);
+  }
+
   Future<void> _submit({bool localDraft = false}) async {
     if (_isSubmitting || _isReadOnly) {
       return;
@@ -592,7 +599,7 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
             severity: _severity,
             vehicleCondition: _vehicleCondition,
             disruptionScope: _disruptionScope,
-            reportedBy: widget.reportedBy,
+            reportedBy: safeStaffDisplayLabel(widget.reportedBy),
             createdAt: now,
           )
         : existing.copyWith(

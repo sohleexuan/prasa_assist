@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/database/local_sync_state.dart';
+import '../../../shared/staff/staff_directory_exception.dart';
+import '../../../shared/staff/staff_directory_repository.dart';
+import '../../../shared/staff/staff_profile.dart';
 import '../data/dto/local_work_order_draft.dart';
 import '../data/dto/local_work_order_record.dart';
 import '../data/dto/work_order_update_input.dart';
@@ -11,14 +14,20 @@ import '../repositories/work_order_data_exception.dart';
 import '../repositories/work_order_hybrid_operations.dart';
 
 class WorkOrdersController extends ChangeNotifier {
-  WorkOrdersController(this._repository, {DateTime Function()? now})
-    : _hybridOperations = null,
-      _localDraftCreatedByLabel = 'Current operations staff',
-      _now = now ?? DateTime.now;
+  WorkOrdersController(
+    this._repository, {
+    this.staffDirectoryRepository,
+    this.currentUserId,
+    DateTime Function()? now,
+  }) : _hybridOperations = null,
+       _localDraftCreatedByLabel = 'Current operations staff',
+       _now = now ?? DateTime.now;
 
   WorkOrdersController.hybrid(
     WorkOrderHybridOperations operations, {
     String localDraftCreatedByLabel = 'Current operations staff',
+    this.staffDirectoryRepository,
+    this.currentUserId,
     DateTime Function()? now,
   }) : _repository = null,
        _hybridOperations = operations,
@@ -35,6 +44,8 @@ class WorkOrdersController extends ChangeNotifier {
 
   final WorkOrderRepository? _repository;
   final WorkOrderHybridOperations? _hybridOperations;
+  final StaffDirectoryRepository? staffDirectoryRepository;
+  final String? currentUserId;
   final String _localDraftCreatedByLabel;
   final DateTime Function() _now;
   List<WorkOrder> _workOrders = const [];
@@ -45,6 +56,9 @@ class WorkOrdersController extends ChangeNotifier {
   String _searchQuery = '';
   Map<String, LocalWorkOrderRecord> _localRecords = const {};
   WorkOrderReadProvenance? _readProvenance;
+  StaffDirectorySnapshot? _staffDirectory;
+  StaffDirectorySnapshot? _assignableStaffDirectory;
+  String? _assignableStaffDirectoryError;
 
   List<WorkOrder> get workOrders => List.unmodifiable(_workOrders);
   List<WorkOrder> get visibleWorkOrders {
@@ -60,7 +74,7 @@ class WorkOrdersController extends ChangeNotifier {
           workOrder.vehicleId,
           workOrder.taskType,
           workOrder.description,
-          workOrder.assignedTo ?? '',
+          assignmentLabelFor(workOrder),
         ].any((value) => value.toLowerCase().contains(query));
       }),
     );
@@ -74,6 +88,27 @@ class WorkOrdersController extends ChangeNotifier {
       _selectedStatus != null || _searchQuery.trim().isNotEmpty;
   bool get isHybrid => _hybridOperations != null;
   WorkOrderReadProvenance? get readProvenance => _readProvenance;
+  StaffDirectorySnapshot? get assignableStaffDirectory =>
+      _assignableStaffDirectory;
+  String? get assignableStaffDirectoryError => _assignableStaffDirectoryError;
+
+  StaffProfile? get currentStaffProfile =>
+      _staffDirectory?.findByUserId(currentUserId);
+
+  bool get canAssignWorkOrders => assignmentUnavailableReason == null;
+
+  String? get assignmentUnavailableReason {
+    if (staffDirectoryRepository == null) return null;
+    final profile = currentStaffProfile;
+    if (profile == null || !profile.active) {
+      return 'Assignment is unavailable until the current active staff profile can be verified.';
+    }
+    if (profile.role != StaffRole.supervisor &&
+        profile.role != StaffRole.controlCentre) {
+      return 'Only active supervisors or control-centre staff can assign work orders.';
+    }
+    return null;
+  }
 
   LocalSyncState? localSyncStateFor(String workOrderId) =>
       _localRecords[workOrderId]?.syncState;
@@ -87,6 +122,7 @@ class WorkOrdersController extends ChangeNotifier {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
+    await _loadStaffDirectory(notify: false);
     if (_hybridOperations == null) {
       try {
         _workOrders = await _repository!.readAll();
@@ -109,6 +145,50 @@ class WorkOrdersController extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> retryAssignableStaffDirectory() =>
+      _loadAssignableStaffDirectory(notify: true);
+
+  Future<void> _loadStaffDirectory({required bool notify}) async {
+    final repository = staffDirectoryRepository;
+    if (repository == null) return;
+    try {
+      _staffDirectory = await repository.load();
+    } on StaffDirectoryException {
+      _staffDirectory = null;
+    } catch (_) {
+      _staffDirectory = null;
+    }
+    if (notify) notifyListeners();
+  }
+
+  Future<void> _loadAssignableStaffDirectory({required bool notify}) async {
+    final repository = staffDirectoryRepository;
+    if (repository == null) return;
+    _assignableStaffDirectoryError = null;
+    try {
+      _assignableStaffDirectory = await repository.loadAssignable();
+    } on StaffDirectoryException catch (error) {
+      _assignableStaffDirectory = null;
+      _assignableStaffDirectoryError = error.safeMessage;
+    } catch (_) {
+      _assignableStaffDirectory = null;
+      _assignableStaffDirectoryError = 'The staff directory is unavailable.';
+    }
+    if (notify) notifyListeners();
+  }
+
+  String createdByLabelFor(WorkOrder workOrder) {
+    final profile = _staffDirectory?.findByUserId(workOrder.createdByUserId);
+    return profile?.displayLabel ?? safeStaffDisplayLabel(workOrder.createdBy);
+  }
+
+  String assignmentLabelFor(WorkOrder workOrder) {
+    final snapshot = workOrder.assignedToLabelSnapshot;
+    if (snapshot != null) return safeStaffDisplayLabel(snapshot);
+    if (workOrder.assignedTo != null) return legacyAssignmentUnverifiedLabel;
+    return 'Not assigned';
   }
 
   Future<void> _loadHybrid() async {
@@ -216,7 +296,7 @@ class WorkOrdersController extends ChangeNotifier {
           scheduledStart: scheduledStart,
           scheduledEnd: scheduledEnd,
           notes: notes,
-          createdByLabel: _optional(createdBy) ?? _localDraftCreatedByLabel,
+          createdByLabel: _optional(createdBy) ?? _defaultCreatedByLabel,
         ),
       );
       await load();
@@ -236,7 +316,7 @@ class WorkOrdersController extends ChangeNotifier {
       scheduledEnd: scheduledEnd,
       status: WorkOrderStatus.draft,
       notes: _optional(notes),
-      createdBy: _optional(createdBy) ?? _localDraftCreatedByLabel,
+      createdBy: _optional(createdBy) ?? _defaultCreatedByLabel,
       createdAt: now,
       updatedAt: now,
     );
@@ -313,6 +393,8 @@ class WorkOrdersController extends ChangeNotifier {
       description: description.trim(),
       priority: priority,
       assignedTo: current.assignedTo,
+      assignedToUserId: current.assignedToUserId,
+      assignedToLabelSnapshot: current.assignedToLabelSnapshot,
       scheduledStart: scheduledStart,
       scheduledEnd: scheduledEnd,
       status: current.status,
@@ -339,16 +421,25 @@ class WorkOrdersController extends ChangeNotifier {
     return _saveTransition(current, WorkOrderStatus.open);
   }
 
-  Future<WorkOrder> assignWorkOrder(
+  Future<WorkOrder> assignWorkOrderToStaff(
     String workOrderId, {
-    required String assignedTo,
+    required StaffProfile assignee,
   }) async {
+    final unavailableReason = assignmentUnavailableReason;
+    if (unavailableReason != null) {
+      throw WorkOrderValidationException(unavailableReason);
+    }
+    if (!assignee.isAssignable) {
+      throw const WorkOrderValidationException(
+        'Only active maintenance staff can receive a work order.',
+      );
+    }
     if (_hybridOperations != null) {
       final current = await _current(workOrderId);
       final version = _confirmedVersion(current);
       final updated = await _hybridOperations.assignConfirmed(
         current.workOrderId,
-        assignedTo: assignedTo,
+        assignedToUserId: assignee.userId,
         expectedVersion: version,
       );
       await load();
@@ -357,16 +448,12 @@ class WorkOrdersController extends ChangeNotifier {
     final current = await _current(workOrderId);
     _requireTransition(current, WorkOrderStatus.assigned);
     _validateReady(current);
-    final normalized = assignedTo.trim();
-    if (normalized.isEmpty) {
-      throw const WorkOrderValidationException(
-        'Responsible staff is required before assignment.',
-      );
-    }
     return _saveTransition(
       current,
       WorkOrderStatus.assigned,
-      assignedTo: normalized,
+      assignedTo: assignee.displayLabel,
+      assignedToUserId: assignee.userId,
+      assignedToLabelSnapshot: assignee.displayLabel,
     );
   }
 
@@ -455,6 +542,8 @@ class WorkOrdersController extends ChangeNotifier {
     WorkOrder current,
     WorkOrderStatus status, {
     String? assignedTo,
+    String? assignedToUserId,
+    String? assignedToLabelSnapshot,
   }) async {
     final now = _now();
     final updated = WorkOrder(
@@ -467,6 +556,9 @@ class WorkOrdersController extends ChangeNotifier {
       description: current.description,
       priority: current.priority,
       assignedTo: assignedTo ?? current.assignedTo,
+      assignedToUserId: assignedToUserId ?? current.assignedToUserId,
+      assignedToLabelSnapshot:
+          assignedToLabelSnapshot ?? current.assignedToLabelSnapshot,
       scheduledStart: current.scheduledStart,
       scheduledEnd: current.scheduledEnd,
       status: status,
@@ -490,6 +582,10 @@ class WorkOrdersController extends ChangeNotifier {
     final trimmed = value?.trim();
     return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
+
+  String get _defaultCreatedByLabel =>
+      _staffDirectory?.findByUserId(currentUserId)?.displayLabel ??
+      safeStaffDisplayLabel(_localDraftCreatedByLabel);
 
   Future<WorkOrder> publishLocalDraft(String workOrderId) async {
     if (_hybridOperations == null) {
@@ -582,6 +678,9 @@ class WorkOrdersController extends ChangeNotifier {
     taskType: record.draft.taskType,
     description: record.draft.description,
     priority: record.draft.priority,
+    assignedTo: record.assignedTo,
+    assignedToUserId: record.assignedToUserId,
+    assignedToLabelSnapshot: record.assignedToLabelSnapshot,
     status: record.status,
     scheduledStart: record.draft.scheduledStart,
     scheduledEnd: record.draft.scheduledEnd,

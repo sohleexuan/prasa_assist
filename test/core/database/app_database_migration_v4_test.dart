@@ -18,14 +18,14 @@ void main() {
 
       expect(
         (await database.rawQuery('PRAGMA user_version')).single['user_version'],
-        7,
+        8,
       );
       expect(
         (await database.query(
           AppDatabaseSchema.migrationTable,
           orderBy: 'version ASC',
         )).map((row) => row['version']),
-        [1, 2, 3, 4, 5, 6, 7],
+        [1, 2, 3, 4, 5, 6, 7, 8],
       );
       final tables = await database.rawQuery(
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN (?, ?, ?)",
@@ -78,7 +78,7 @@ void main() {
           AppDatabaseSchema.migrationTable,
           orderBy: 'version ASC',
         )).map((row) => row['version']),
-        [1, 2, 3, 4, 5, 6, 7],
+        [1, 2, 3, 4, 5, 6, 7, 8],
       );
       await upgraded.close();
 
@@ -309,7 +309,7 @@ void main() {
             AppDatabaseSchema.migrationTable,
             orderBy: 'version ASC',
           )).map((row) => row['version']),
-          [1, 2, 3, 4, 5, 6, 7],
+          [1, 2, 3, 4, 5, 6, 7, 8],
         );
         expect(
           await reopened.query(AppDatabaseMigrationV2.deploymentRecordsTable),

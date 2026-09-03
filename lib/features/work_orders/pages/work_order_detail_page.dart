@@ -5,6 +5,8 @@ import '../../../core/time/malaysia_time.dart';
 import '../../../shared/widgets/app_error_state.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
 import '../../../shared/widgets/app_section_card.dart';
+import '../../../shared/staff/staff_directory_repository.dart';
+import '../../../shared/staff/staff_profile.dart';
 import '../controllers/work_orders_controller.dart';
 import '../models/work_order.dart';
 import '../repositories/work_order_data_exception.dart';
@@ -107,7 +109,10 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
                           ),
                           _DetailRow(
                             label: 'Assigned to',
-                            value: workOrder.assignedTo ?? 'Not assigned',
+                            value: widget.controller.assignmentLabelFor(
+                              workOrder,
+                            ),
+                            selectable: true,
                           ),
                           _DetailRow(
                             label: 'Scheduled start',
@@ -119,7 +124,10 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
                           ),
                           _DetailRow(
                             label: 'Created by',
-                            value: workOrder.createdBy,
+                            value: widget.controller.createdByLabelFor(
+                              workOrder,
+                            ),
+                            selectable: true,
                           ),
                           _DetailRow(
                             label: 'Created at',
@@ -228,6 +236,9 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
             WorkOrderStatus.open,
           )
         : null;
+    final assignmentBlockReason = workOrder.status == WorkOrderStatus.open
+        ? widget.controller.assignmentUnavailableReason
+        : null;
     final primary = switch (workOrder.status) {
       WorkOrderStatus.draft => FilledButton.icon(
         key: const Key('openWorkOrderAction'),
@@ -239,7 +250,9 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
       ),
       WorkOrderStatus.open => FilledButton.icon(
         key: const Key('assignWorkOrderAction'),
-        onPressed: _isWorking ? null : () => _assign(workOrder),
+        onPressed: _isWorking || assignmentBlockReason != null
+            ? null
+            : () => _assign(workOrder),
         icon: const Icon(Icons.person_add_alt_1_outlined),
         label: const Text('Assign responsible staff'),
       ),
@@ -262,6 +275,7 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
       title: 'Staff actions',
       subtitle:
           transitionBlockReason ??
+          assignmentBlockReason ??
           'Review and explicitly confirm each operational action.',
       body: Wrap(
         spacing: AppSpacing.sm,
@@ -313,12 +327,12 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
   }
 
   Future<void> _assign(WorkOrder workOrder) async {
-    final assignedTo = await _assignmentDialog(workOrder);
-    if (assignedTo == null) return;
+    final assignee = await _assignmentDialog(workOrder);
+    if (!mounted || assignee == null) return;
     await _runAction(
-      () => widget.controller.assignWorkOrder(
+      () => widget.controller.assignWorkOrderToStaff(
         workOrder.workOrderId,
-        assignedTo: assignedTo,
+        assignee: assignee,
       ),
     );
   }
@@ -394,10 +408,13 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
         false;
   }
 
-  Future<String?> _assignmentDialog(WorkOrder workOrder) async {
-    return showDialog<String>(
+  Future<StaffProfile?> _assignmentDialog(WorkOrder workOrder) async {
+    return showDialog<StaffProfile>(
       context: context,
-      builder: (context) => _AssignmentDialog(workOrder: workOrder),
+      builder: (context) => _AssignmentDialog(
+        workOrder: workOrder,
+        controller: widget.controller,
+      ),
     );
   }
 
@@ -450,48 +467,62 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
 }
 
 class _AssignmentDialog extends StatefulWidget {
-  const _AssignmentDialog({required this.workOrder});
+  const _AssignmentDialog({required this.workOrder, required this.controller});
 
   final WorkOrder workOrder;
+  final WorkOrdersController controller;
 
   @override
   State<_AssignmentDialog> createState() => _AssignmentDialogState();
 }
 
 class _AssignmentDialogState extends State<_AssignmentDialog> {
-  final _textController = TextEditingController();
-  String? _error;
+  StaffDirectorySnapshot? _snapshot;
+  StaffProfile? _selected;
+  bool _loading = false;
 
   @override
-  void dispose() {
-    _textController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _snapshot = widget.controller.assignableStaffDirectory;
+    if (_snapshot == null) {
+      _loading = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _load();
+      });
+    }
+  }
+
+  Future<void> _load() async {
+    if (!mounted) return;
+    setState(() => _loading = true);
+    await widget.controller.retryAssignableStaffDirectory();
+    if (!mounted) return;
+    setState(() {
+      _snapshot = widget.controller.assignableStaffDirectory;
+      _loading = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Assign responsible staff'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Assign ${widget.workOrder.workOrderId} only after staff '
-              'review. AI does not assign personnel automatically.',
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextField(
-              key: const Key('assignedToField'),
-              controller: _textController,
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: 'Responsible staff',
-                errorText: _error,
+      content: SizedBox(
+        width: 520,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Assign ${widget.workOrder.workOrderId} only after staff '
+                'review. AI does not assign personnel automatically.',
               ),
-            ),
-          ],
+              const SizedBox(height: AppSpacing.md),
+              ..._directoryContent(),
+            ],
+          ),
         ),
       ),
       actions: [
@@ -501,18 +532,82 @@ class _AssignmentDialogState extends State<_AssignmentDialog> {
         ),
         FilledButton(
           key: const Key('confirmAssignmentAction'),
-          onPressed: () {
-            final value = _textController.text.trim();
-            if (value.isEmpty) {
-              setState(() => _error = 'Responsible staff is required.');
-              return;
-            }
-            Navigator.of(context).pop(value);
-          },
+          onPressed: _selected == null
+              ? null
+              : () => Navigator.of(context).pop(_selected),
           child: const Text('Confirm assignment'),
         ),
       ],
     );
+  }
+
+  List<Widget> _directoryContent() {
+    if (_loading) {
+      return const [
+        Center(
+          child: CircularProgressIndicator(key: Key('staffDirectoryLoading')),
+        ),
+      ];
+    }
+    final error = widget.controller.assignableStaffDirectoryError;
+    if (_snapshot == null && error != null) {
+      return [
+        Text(error, key: const Key('staffDirectoryError')),
+        const SizedBox(height: AppSpacing.sm),
+        OutlinedButton.icon(
+          key: const Key('retryStaffDirectory'),
+          onPressed: _load,
+          icon: const Icon(Icons.refresh),
+          label: const Text('Retry'),
+        ),
+      ];
+    }
+    final snapshot = _snapshot;
+    final staff = snapshot?.assignableStaff ?? const <StaffProfile>[];
+    if (staff.isEmpty) {
+      return [
+        const Text(
+          'No active maintenance staff are available for assignment.',
+          key: Key('staffDirectoryEmpty'),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        OutlinedButton.icon(
+          key: const Key('retryStaffDirectory'),
+          onPressed: _load,
+          icon: const Icon(Icons.refresh),
+          label: const Text('Retry'),
+        ),
+      ];
+    }
+    return [
+      if (snapshot!.isCached)
+        Container(
+          key: const Key('staffDirectoryCachedNotice'),
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          color: Theme.of(context).colorScheme.secondaryContainer,
+          child: Text(
+            snapshot.isStale
+                ? 'Offline cached directory — may be out of date. The server will revalidate the assignment.'
+                : 'Offline cached directory. The server will revalidate the assignment.',
+          ),
+        ),
+      if (snapshot.isCached) const SizedBox(height: AppSpacing.sm),
+      for (final profile in staff)
+        ListTile(
+          key: ValueKey('staff-${profile.staffCode}'),
+          selected: _selected == profile,
+          leading: Icon(
+            _selected == profile
+                ? Icons.radio_button_checked
+                : Icons.radio_button_unchecked,
+          ),
+          onTap: () => setState(() => _selected = profile),
+          title: Text(profile.displayLabel),
+          subtitle: const Text('Maintenance staff'),
+          contentPadding: EdgeInsets.zero,
+        ),
+    ];
   }
 }
 
@@ -521,11 +616,13 @@ class _DetailRow extends StatelessWidget {
     required this.label,
     required this.value,
     this.showDivider = true,
+    this.selectable = false,
   });
 
   final String label;
   final String value;
   final bool showDivider;
+  final bool selectable;
 
   @override
   Widget build(BuildContext context) {
@@ -533,19 +630,36 @@ class _DetailRow extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 2,
-                child: Text(
-                  label,
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(flex: 3, child: Text(value, textAlign: TextAlign.end)),
-            ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final valueWidget = selectable
+                  ? SelectableText(value)
+                  : Text(value, textAlign: TextAlign.end);
+              if (constraints.maxWidth < 420) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: Theme.of(context).textTheme.labelLarge),
+                    const SizedBox(height: AppSpacing.xs),
+                    valueWidget,
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      label,
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(flex: 3, child: valueWidget),
+                ],
+              );
+            },
           ),
         ),
         if (showDivider) const Divider(),

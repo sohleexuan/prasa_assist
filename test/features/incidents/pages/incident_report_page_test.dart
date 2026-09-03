@@ -132,6 +132,34 @@ void main() {
     expect(await repository.getById('INC-TEST-001'), saved);
   });
 
+  testWidgets('bare email reporter is replaced by the unavailable label', (
+    tester,
+  ) async {
+    final repository = InMemoryIncidentRepository(clock: _clock);
+    final controller = IncidentController(repository: repository);
+    Incident? saved;
+    addTearDown(controller.dispose);
+    await _pumpPage(
+      tester,
+      controller: controller,
+      reportedBy: 'legacy.reporter@example.test',
+      onSaved: (value) => saved = value,
+    );
+
+    expect(find.textContaining('legacy.reporter@example.test'), findsNothing);
+    expect(find.textContaining('Staff profile unavailable'), findsOneWidget);
+
+    await _fillRequiredReport(tester);
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('submit-incident-report-button')),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(saved?.reportedBy, 'Staff profile unavailable');
+  });
+
   testWidgets('allows an optional vehicle for a non-vehicle incident', (
     tester,
   ) async {

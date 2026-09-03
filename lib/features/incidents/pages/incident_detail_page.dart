@@ -10,6 +10,7 @@ import '../../../shared/widgets/app_loading_indicator.dart';
 import '../../../shared/widgets/app_page_scaffold.dart';
 import '../../../shared/widgets/app_section_card.dart';
 import '../../../shared/widgets/app_status_chip.dart';
+import '../../../shared/staff/staff_profile.dart';
 import '../controllers/incident_controller.dart';
 import '../integration/m1_incident_recommendation_facts.dart';
 import '../models/incident.dart';
@@ -395,14 +396,15 @@ class _IncidentDetailPageState extends State<IncidentDetailPage> {
     if (_isSubmitting) {
       return;
     }
-    final staffId = widget.currentStaffId.trim();
-    if (staffId.isEmpty) {
+    final rawStaffId = widget.currentStaffId.trim();
+    if (rawStaffId.isEmpty) {
       setState(() {
         _operationError =
             'A staff identity is required before changing Incident status.';
       });
       return;
     }
+    final staffId = safeStaffDisplayLabel(rawStaffId);
     setState(() {
       _isSubmitting = true;
       _operationError = null;
@@ -561,7 +563,10 @@ class _OverviewCard extends StatelessWidget {
             label: 'Reported Time',
             value: _formatDateTime(incident.reportedAt),
           ),
-          _DetailRow(label: 'Reported By', value: incident.reportedBy),
+          _DetailRow(
+            label: 'Reported By',
+            value: safeStaffDisplayLabel(incident.reportedBy),
+          ),
         ],
       ),
     );
@@ -706,7 +711,7 @@ class _HistoryEntry extends StatelessWidget {
                   style: Theme.of(context).textTheme.labelLarge,
                 ),
                 Text(
-                  '${_formatDateTime(change.changedAt)} · ${change.changedBy}',
+                  '${_formatDateTime(change.changedAt)} · ${safeStaffDisplayLabel(change.changedBy)}',
                 ),
                 if (change.note != null) Text(change.note!),
               ],
