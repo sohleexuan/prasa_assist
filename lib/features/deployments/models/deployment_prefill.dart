@@ -1,5 +1,3 @@
-/// Carries optional incident and recommendation details into a new deployment
-/// form. A prefill is advisory only and always creates a draft for staff review.
 class DeploymentPrefill {
   const DeploymentPrefill({
     this.incidentId,

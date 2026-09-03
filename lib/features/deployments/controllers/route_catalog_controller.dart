@@ -27,7 +27,6 @@ class RouteCatalogController extends ChangeNotifier {
       _snapshot = await _repository.loadCatalog();
       _state = RouteCatalogLoadState.loaded;
     } catch (_) {
-      // Provider details are deliberately not exposed to future UI consumers.
       _snapshot = null;
       _state = RouteCatalogLoadState.unavailable;
     }

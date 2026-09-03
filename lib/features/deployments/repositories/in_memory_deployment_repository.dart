@@ -4,9 +4,6 @@ import 'deployment_data_exception.dart';
 import 'deployment_repository.dart';
 import 'deployment_repository_capabilities.dart';
 
-/// In-memory storage for development and demonstration only.
-///
-/// This repository is not a live data source and does not connect to Supabase.
 class InMemoryDeploymentRepository
     implements DeploymentRepository, DeploymentRepositoryCapabilitiesProvider {
   InMemoryDeploymentRepository({
@@ -23,7 +20,6 @@ class InMemoryDeploymentRepository
     }
   }
 
-  /// Creates a repository containing mock data for the shared Bus B1023 demo.
   factory InMemoryDeploymentRepository.withDemonstrationData() {
     return InMemoryDeploymentRepository(seedData: [demonstrationDeployment]);
   }
@@ -34,7 +30,6 @@ class InMemoryDeploymentRepository
   DeploymentRepositoryCapabilities get capabilities =>
       const DeploymentRepositoryCapabilities.prototype();
 
-  /// Mock data only; the identifiers and operational details are demonstrative.
   static ServiceDeployment get demonstrationDeployment => ServiceDeployment(
     deploymentId: 'DEP-120',
     routeId: '300',

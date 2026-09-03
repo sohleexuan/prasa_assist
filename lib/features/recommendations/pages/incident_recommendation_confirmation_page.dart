@@ -10,16 +10,10 @@ import '../integration/m1_incident_recommendation_adapter.dart';
 import '../repositories/recommendation_data_exception.dart';
 import '../services/incident_recommendation_submission_service.dart';
 
-/// Returns a newly persisted pending-review recommendation to composition code.
 typedef IncidentRecommendationSubmittedCallback = void Function(
   RecommendationRecordDto record,
 );
 
-/// Collects explicit staff confirmation before submitting Module 1 facts.
-///
-/// This page does not navigate, change the incident, accept/reject a
-/// recommendation, or prepare downstream work. Composition code owns those
-/// actions through [onSubmitted].
 class IncidentRecommendationConfirmationPage extends StatefulWidget {
   const IncidentRecommendationConfirmationPage({
     required this.facts,

@@ -1,10 +1,6 @@
 import 'recommendation_evidence.dart';
 import 'recommendation_rule_input.dart';
 
-/// Verified incident facts supplied by the owning incident workflow.
-///
-/// This Module 4 contract is deliberately independent from Module 1 models.
-/// It contains only facts that deterministic recommendation rules may use.
 class VerifiedIncidentRecommendationInput {
   VerifiedIncidentRecommendationInput({
     required String incidentId,

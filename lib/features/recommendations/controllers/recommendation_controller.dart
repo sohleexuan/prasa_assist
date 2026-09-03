@@ -69,7 +69,7 @@ class RecommendationController extends ChangeNotifier {
     try {
       _staffDirectory = await repository.load();
     } on StaffDirectoryException {
-      // Recommendation records remain usable with a neutral staff fallback.
+      return;
     }
   }
 

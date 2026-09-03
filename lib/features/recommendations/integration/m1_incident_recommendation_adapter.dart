@@ -3,10 +3,6 @@ import '../domain/recommendation_evidence.dart';
 import '../domain/recommendation_rule_input.dart';
 import '../domain/verified_incident_recommendation_input.dart';
 
-/// Explicit staff decisions required before Module 1 facts become rule input.
-///
-/// A suggested demonstration period is only a UI prefill. It still needs this
-/// confirmation before the deterministic engine can consider it.
 class IncidentRecommendationStaffConfirmation {
   const IncidentRecommendationStaffConfirmation({
     required this.breakdownConfirmedByStaff,
@@ -19,14 +15,9 @@ class IncidentRecommendationStaffConfirmation {
   final bool operatingPeriodConfirmedByStaff;
 }
 
-/// Pure Module 4 adapter for the versioned Module 1 recommendation contract.
-///
-/// It has no repository dependency and never creates a recommendation. The
-/// caller must explicitly pass its output to the submission service.
 class M1IncidentRecommendationAdapter {
   const M1IncidentRecommendationAdapter();
 
-  /// Provides the shared demo's peak-period prefill, never a confirmation.
   OperatingPeriod? operatingPeriodPrefill(
     M1IncidentRecommendationFacts facts,
   ) => _isValidDemonstrationScenario(facts) ? OperatingPeriod.peak : null;

@@ -1,6 +1,5 @@
 import 'package:sqflite/sqflite.dart';
 
-/// Globally ordered schema version 5: Module 4 recommendation review cache.
 abstract final class AppDatabaseMigrationV5 {
   static const recommendationRecordsTable = 'local_recommendation_records';
   static const recommendationAnalysesTable = 'local_recommendation_analyses';

@@ -17,14 +17,10 @@ import '../services/recommendation_deployment_prefill_factory.dart';
 import '../widgets/recommendation_analysis_panel.dart';
 import '../widgets/recommendation_data_notice.dart';
 
-/// Lets the coordinator open Module 3's editable create form. The callback is
-/// advisory only; Module 4 does not navigate or persist a deployment.
 typedef PrepareServiceDeploymentCallback = FutureOr<void> Function(
   DeploymentPrefill prefill,
 );
 
-/// Lets the coordinator open Module 2's editable create form. The callback is
-/// advisory only; Module 4 does not navigate or persist a work order.
 typedef PrepareWorkOrderCallback = FutureOr<void> Function(
   WorkOrderPrefill prefill,
 );

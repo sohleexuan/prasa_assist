@@ -1,7 +1,6 @@
 import '../../../core/database/local_sync_state.dart';
 import 'incident.dart';
 
-/// An unpublished, owner-scoped report. Staff must explicitly submit it.
 class LocalIncidentWorkItem {
   const LocalIncidentWorkItem({
     required this.localId,

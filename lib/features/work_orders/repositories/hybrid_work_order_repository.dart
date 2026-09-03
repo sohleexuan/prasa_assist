@@ -11,11 +11,6 @@ import '../models/work_order_read_result.dart';
 import 'work_order_data_exception.dart';
 import 'work_order_hybrid_operations.dart';
 
-/// Coordinates a remote work-order authority with owner-scoped SQLite data.
-///
-/// Confirmed records come from the remote source. SQLite stores a confirmed
-/// cache plus unpublished drafts, and cached reads are used only for verified
-/// connectivity failures. Publishing is always an explicit staff action.
 class HybridWorkOrderRepository implements WorkOrderHybridOperations {
   factory HybridWorkOrderRepository({
     required WorkOrderRemoteDataSource remoteDataSource,

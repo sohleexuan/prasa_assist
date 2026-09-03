@@ -169,7 +169,6 @@ select lives_ok($$select public.create_work_order('uuid-label','{"vehicle_id":"B
 reset role;
 select is((select created_by_label from public.work_orders where publication_key='uuid-label'),'22222222-2222-4222-8222-222222222222','creator label falls back to authenticated UUID');
 
--- Authority, DTO boundary, idempotency, and lifecycle regression coverage.
 set local role authenticated;
 select throws_ok($$update public.work_orders set notes='direct update'$$,'42501',null,'authenticated direct UPDATE fails at runtime');
 select throws_ok($$delete from public.work_orders$$,'42501',null,'authenticated direct DELETE fails at runtime');

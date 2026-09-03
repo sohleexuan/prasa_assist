@@ -4,7 +4,6 @@ import '../../repositories/deployment_data_exception.dart';
 import 'deployment_record_dto.dart';
 import 'local_deployment_draft.dart';
 
-/// Owner-scoped local cache or unpublished work record.
 class LocalDeploymentRecord {
   LocalDeploymentRecord({
     required String localId,

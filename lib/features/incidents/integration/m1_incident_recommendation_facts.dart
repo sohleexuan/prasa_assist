@@ -3,17 +3,10 @@ import 'dart:async';
 import '../models/incident.dart';
 import '../models/incident_enums.dart';
 
-/// Composition-owned action for a staff member who explicitly chooses to
-/// prepare an AI recommendation from verified Module 1 facts.
 typedef PrepareIncidentRecommendationCallback = FutureOr<void> Function(
   M1IncidentRecommendationFacts facts,
 );
 
-/// Versioned, immutable Module 1 facts prepared for a future recommendation
-/// hand-off.
-///
-/// This DTO contains only approved Incident facts. It does not create a
-/// recommendation, authorise an operational action, or depend on Module 4.
 class M1IncidentRecommendationFacts {
   M1IncidentRecommendationFacts._({
     required this.incidentId,

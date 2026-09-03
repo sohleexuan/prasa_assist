@@ -1,12 +1,10 @@
 import '../services/incident_validator.dart';
 
-/// Base type for safe, persistence-neutral Incident data failures.
 abstract class IncidentDataException implements Exception {
   const IncidentDataException(this.message, {this.cause});
 
   final String message;
 
-  /// Retained for diagnostics only. UI code should display [message].
   final Object? cause;
 
   @override

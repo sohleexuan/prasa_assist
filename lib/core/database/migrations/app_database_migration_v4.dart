@@ -1,9 +1,5 @@
 import 'package:sqflite/sqflite.dart';
 
-/// Globally ordered schema version 4: Module 2 local WorkOrder storage.
-///
-/// Supabase remains authoritative. This table stores owner-scoped confirmed
-/// cache records and explicitly unpublished local staff drafts.
 abstract final class AppDatabaseMigrationV4 {
   static const String workOrderRecordsTable = 'local_work_order_records';
 

@@ -1,6 +1,5 @@
 import '../../repositories/deployment_data_exception.dart';
 
-/// Storage-neutral representation of a service deployment record.
 class DeploymentRecordDto {
   DeploymentRecordDto({
     required this.deploymentCode,

@@ -2,7 +2,6 @@ import '../dto/deployment_record_dto.dart';
 import '../dto/local_deployment_draft.dart';
 import '../dto/local_deployment_record.dart';
 
-/// Provider-neutral owner-scoped boundary for local deployment work and cache.
 abstract interface class DeploymentLocalDataSource {
   Future<List<LocalDeploymentRecord>> readConfirmedCacheRecords();
 
@@ -19,7 +18,6 @@ abstract interface class DeploymentLocalDataSource {
     required DateTime retrievedAtUtc,
   });
 
-  /// Includes Draft, pending, failed and conflict records; never remote cache.
   Future<List<LocalDeploymentRecord>> readLocalWorkItems();
 
   Future<LocalDeploymentRecord?> readLocalWorkItem(String localId);

@@ -4,9 +4,6 @@ import '../controllers/incident_controller.dart';
 import '../models/incident.dart';
 import 'incident_report_page.dart';
 
-/// Ordinary Module 1 edit entry page.
-///
-/// Status changes remain separate explicit actions on the Incident detail page.
 class IncidentEditPage extends StatelessWidget {
   const IncidentEditPage({
     required this.controller,

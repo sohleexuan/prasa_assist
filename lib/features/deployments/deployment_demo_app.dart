@@ -2,10 +2,6 @@ import 'package:flutter/widgets.dart';
 
 import 'service_deployment_page.dart';
 
-/// Backward-compatible feature harness.
-///
-/// New integration code should use [ServiceDeploymentPage] directly. This
-/// wrapper intentionally does not create a MaterialApp.
 @Deprecated('Use ServiceDeploymentPage directly.')
 class DeploymentDemoApp extends StatelessWidget {
   const DeploymentDemoApp({this.clock, this.deploymentIdGenerator, super.key});

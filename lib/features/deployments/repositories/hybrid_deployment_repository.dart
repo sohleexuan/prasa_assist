@@ -12,10 +12,6 @@ import 'deployment_hybrid_operations.dart';
 import 'deployment_repository.dart';
 import 'deployment_repository_capabilities.dart';
 
-/// Coordinates Supabase authority with owner-scoped SQLite cache and drafts.
-///
-/// Reads always try Supabase first. Only a typed transport failure permits an
-/// explicitly cached fallback; all other remote failures remain authoritative.
 class HybridDeploymentRepository
     implements
         DeploymentRepository,

@@ -1,9 +1,5 @@
 import 'package:sqflite/sqflite.dart';
 
-/// Globally ordered schema version 2.
-///
-/// The physical schema lives in shared infrastructure so core never imports a
-/// feature module. Module 3 may import these stable table-name constants.
 abstract final class AppDatabaseMigrationV2 {
   static const String deploymentRecordsTable = 'local_deployment_records';
   static const String deploymentVehiclesTable = 'local_deployment_vehicles';

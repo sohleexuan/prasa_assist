@@ -2,8 +2,6 @@ import 'package:sqflite/sqflite.dart';
 
 import 'app_database_migration_v4.dart';
 
-/// Globally ordered schema version 8: owner-scoped staff directory cache and
-/// stable Work Order assignment identity snapshots.
 abstract final class AppDatabaseMigrationV8 {
   static const String staffProfilesTable = 'local_staff_profiles';
 

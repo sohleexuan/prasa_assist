@@ -1,7 +1,5 @@
 import '../models/work_order.dart';
 
-/// Local demonstration records only. They are not live, real-time, or
-/// government data.
 final List<WorkOrder> mockWorkOrders = [
   WorkOrder(
     workOrderId: 'WO-DEMO-001',

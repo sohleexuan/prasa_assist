@@ -3,8 +3,6 @@ import '../data/dto/recommendation_record_dto.dart';
 import '../domain/recommendation_action.dart';
 import '../domain/recommendation_status.dart';
 
-/// Produces the typed Module 3 deployment form contract after staff accepts a
-/// deterministic replacement-bus recommendation.
 class RecommendationDeploymentPrefillFactory {
   const RecommendationDeploymentPrefillFactory();
 

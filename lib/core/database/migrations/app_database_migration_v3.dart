@@ -1,9 +1,5 @@
 import 'package:sqflite/sqflite.dart';
 
-/// Globally ordered schema version 3: Module 1 local Incident storage.
-///
-/// Supabase remains authoritative. These tables only hold owner-scoped cached
-/// remote Incidents and clearly unpublished local staff drafts.
 abstract final class AppDatabaseMigrationV3 {
   static const String incidentRecordsTable = 'local_incident_records';
   static const String incidentHistoryTable = 'local_incident_status_history';

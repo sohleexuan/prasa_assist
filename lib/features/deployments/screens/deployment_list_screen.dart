@@ -63,7 +63,6 @@ class _DeploymentListScreenState extends State<DeploymentListScreen> {
   void dispose() {
     widget.controller.removeListener(_handleControllerChange);
     _searchController.dispose();
-    // The controller is supplied by the parent and remains parent-owned.
     super.dispose();
   }
 

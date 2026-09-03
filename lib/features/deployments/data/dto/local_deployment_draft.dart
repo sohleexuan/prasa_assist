@@ -2,7 +2,6 @@ import '../../models/deployment_status.dart';
 import '../../models/service_deployment.dart';
 import '../../repositories/deployment_data_exception.dart';
 
-/// Staff-editable deployment values before Supabase confirms publication.
 class LocalDeploymentDraft {
   LocalDeploymentDraft({
     required String routeId,

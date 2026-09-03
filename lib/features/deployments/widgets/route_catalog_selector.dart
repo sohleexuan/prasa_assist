@@ -4,9 +4,6 @@ import '../../../core/theme/app_spacing.dart';
 import '../controllers/route_catalog_controller.dart';
 import '../models/route_catalog.dart';
 
-/// Searchable advisory route guidance backed by a route-catalog controller.
-///
-/// Deployment fields change only after staff explicitly selects a result.
 class RouteCatalogSelector extends StatefulWidget {
   const RouteCatalogSelector({
     required this.controller,

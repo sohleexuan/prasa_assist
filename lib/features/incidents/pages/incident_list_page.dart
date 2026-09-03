@@ -26,11 +26,6 @@ import '../widgets/incident_data_notice.dart';
 import 'incident_detail_page.dart';
 import 'incident_report_page.dart';
 
-/// Normal page entry point for Module 1.
-///
-/// This page owns its Controller but does not create a MaterialApp or modify
-/// shared navigation. The integration layer may inject a different Repository
-/// after the team approves a shared Incident persistence contract.
 class IncidentListPage extends StatefulWidget {
   const IncidentListPage({
     required this.currentStaffId,

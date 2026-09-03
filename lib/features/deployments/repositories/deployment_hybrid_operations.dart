@@ -3,10 +3,6 @@ import '../data/dto/local_deployment_record.dart';
 import '../models/deployment_read_result.dart';
 import '../models/service_deployment.dart';
 
-/// Optional Module 3 operations available from hybrid persistence.
-///
-/// Keeping this separate preserves the existing [DeploymentRepository]
-/// contract for prototype and remote-only implementations.
 abstract interface class DeploymentHybridOperations {
   Future<DeploymentReadResult<List<ServiceDeployment>>> getAllWithProvenance();
 

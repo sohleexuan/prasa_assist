@@ -1,8 +1,6 @@
 import '../models/delay_estimate.dart';
 import '../models/incident_enums.dart';
 
-/// Applies transparent PrasaAssist demonstration rules, not an official
-/// Prasarana delay model. All operational results require staff review.
 class DelayEstimator {
   const DelayEstimator();
 
@@ -56,10 +54,6 @@ class DelayEstimator {
     );
   }
 
-  /// Expects [reportedAt] to represent Malaysian local operating time.
-  ///
-  /// These weekday windows are adjustable project assumptions and must not be
-  /// presented as an official Prasarana schedule or policy.
   static bool isDemonstrationPeakHour(DateTime reportedAt) {
     final isWeekday =
         reportedAt.weekday >= DateTime.monday &&

@@ -65,10 +65,7 @@ class IncidentController extends ChangeNotifier {
       if (hybrid != null) {
         try {
           localWorkItems = await hybrid.getLocalWorkItems();
-        } catch (_) {
-          // A valid authoritative or cached read remains usable if only the
-          // optional local-draft list cannot be loaded.
-        }
+        } catch (_) {}
       }
       _emitList(
         incidents,

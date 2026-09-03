@@ -6,9 +6,6 @@ import 'deployment_data_exception.dart';
 import 'deployment_repository.dart';
 import 'deployment_repository_capabilities.dart';
 
-/// Persistence-ready repository over a provider-neutral remote data source.
-///
-/// This class does not connect Supabase, SQLite, HTTP or GTFS by itself.
 class PersistentDeploymentRepository
     implements DeploymentRepository, DeploymentRepositoryCapabilitiesProvider {
   PersistentDeploymentRepository({

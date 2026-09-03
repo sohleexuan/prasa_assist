@@ -1,10 +1,8 @@
-/// Base type for safe, persistence-neutral deployment data failures.
 abstract class DeploymentDataException implements Exception {
   const DeploymentDataException(this.message, {this.cause});
 
   final String message;
 
-  /// Retained for diagnostics only. UI code should display [message].
   final Object? cause;
 
   @override

@@ -162,7 +162,6 @@ class _DeploymentFormScreenState extends State<DeploymentFormScreen> {
     _purposeController.dispose();
     _incidentIdController.dispose();
     _recommendationIdController.dispose();
-    // The DeploymentController is supplied and owned by the parent.
     super.dispose();
   }
 

@@ -21,8 +21,6 @@ class RecommendationListPage extends StatefulWidget {
   final RecommendationController controller;
   final PrepareWorkOrderCallback? onPrepareWorkOrder;
 
-  /// Retained temporarily so existing app composition can transfer ownership
-  /// without Module 4 using it for navigation or persistence.
   @Deprecated('Use onPrepareWorkOrder for coordinator-owned navigation.')
   final ChangeNotifier? workOrdersController;
   final PrepareServiceDeploymentCallback? onPrepareServiceDeployment;

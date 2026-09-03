@@ -6,10 +6,6 @@ import 'mappers/work_order_mapper.dart';
 import 'sources/work_order_local_data_source.dart';
 import 'work_order_repository.dart';
 
-/// Adapts owner-scoped local work-order drafts to the form controller contract.
-///
-/// New records remain local drafts until a separate staff-controlled
-/// publication flow is available.
 class SqliteDraftWorkOrderRepository implements WorkOrderRepository {
   SqliteDraftWorkOrderRepository(this._localDataSource);
 

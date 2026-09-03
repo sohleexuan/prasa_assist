@@ -1,9 +1,3 @@
-// Public integration surface for Module 1 — Incident Reporting and Delay
-// Estimation.
-//
-// Shared application code should prefer this file over importing Module 1
-// implementation details. Adding Module 1 to the shared registry still
-// requires team approval.
 export 'data/incident_demo_data.dart';
 export 'data/sources/supabase_incident_remote_data_source.dart';
 export 'integration/incident_operational_snapshot.dart';

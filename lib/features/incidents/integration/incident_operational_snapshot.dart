@@ -2,11 +2,6 @@ import '../models/incident.dart';
 import '../models/incident_enums.dart';
 import '../models/incident_status_change.dart';
 
-/// A versioned, read-only Module 1 output for downstream decision support.
-///
-/// This is not a shared database schema and does not authorise automatic
-/// operational action. A later cross-module integration can consume the JSON-
-/// safe representation after the team agrees where that integration belongs.
 class IncidentOperationalSnapshot {
   IncidentOperationalSnapshot._({
     required this.incidentId,

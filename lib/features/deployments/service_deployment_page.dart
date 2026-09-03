@@ -15,10 +15,6 @@ import 'screens/deployment_detail_screen.dart';
 import 'screens/deployment_form_screen.dart';
 import 'screens/deployment_list_screen.dart';
 
-/// Normal page entry point for Module 3.
-///
-/// The page owns its controller but does not create a [MaterialApp], so the
-/// integration layer can place it directly in the shared application shell.
 class ServiceDeploymentPage extends StatefulWidget {
   const ServiceDeploymentPage({
     this.repository,
@@ -35,9 +31,6 @@ class ServiceDeploymentPage extends StatefulWidget {
   final DeploymentRepository? repository;
   final RouteCatalogRepository? routeCatalogRepository;
 
-  /// Opens the existing editable create form once after navigation to this
-  /// page. The caller must supply an advisory [DeploymentPrefill]; it never
-  /// creates, schedules, publishes, or allocates a deployment by itself.
   final DeploymentPrefill? initialCreatePrefill;
   final String currentUserId;
   final DateTime Function()? clock;

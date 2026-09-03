@@ -2,13 +2,6 @@ import 'package:sqflite/sqflite.dart';
 
 import 'app_database_migration_v4.dart';
 
-/// Globally ordered schema version 7: Work Order route linkage and strict
-/// schedule writes.
-///
-/// The table is not rebuilt, so legacy equality rows remain readable. The
-/// triggers reject equality or reversed schedules on new writes while allowing
-/// an upgraded equality row to be corrected, cancelled, or refreshed after
-/// cancellation.
 abstract final class AppDatabaseMigrationV7 {
   static const _table = AppDatabaseMigrationV4.workOrderRecordsTable;
 

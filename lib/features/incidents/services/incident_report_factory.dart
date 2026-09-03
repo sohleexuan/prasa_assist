@@ -7,7 +7,6 @@ import 'delay_estimator.dart';
 
 typedef IncidentIdGenerator = String Function(DateTime now);
 
-/// Builds a new staff-entered Incident with the required initial audit entry.
 class IncidentReportFactory {
   const IncidentReportFactory({this.estimator = const DelayEstimator()});
 

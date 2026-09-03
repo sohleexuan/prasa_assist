@@ -2,7 +2,6 @@ import 'package:sqflite/sqflite.dart';
 
 import 'app_database_migration_v5.dart';
 
-/// Globally ordered schema version 6: accepts historical Gemini and Groq analyses.
 abstract final class AppDatabaseMigrationV6 {
   static const _replacementTable = 'local_recommendation_analyses_v6';
 

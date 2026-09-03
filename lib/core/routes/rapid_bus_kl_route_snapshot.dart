@@ -3,11 +3,6 @@ import 'route_catalog.dart';
 const _sourceUrl =
     'https://api.data.gov.my/gtfs-static/prasarana?category=rapid-bus-kl';
 
-/// Cached government static data derived from the verified Prasarana feed.
-///
-/// These values are intentionally compiled into Module 3. Runtime code does
-/// not download or parse GTFS, and this snapshot must not be described as
-/// realtime operational data.
 final RouteCatalogSnapshot rapidBusKlRouteSnapshot = RouteCatalogSnapshot(
   metadata: RouteCatalogSourceMetadata(
     sourceUrl: _sourceUrl,

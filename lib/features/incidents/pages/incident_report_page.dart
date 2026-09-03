@@ -129,7 +129,6 @@ class _IncidentReportPageState extends State<IncidentReportPage> {
     _routeNameController.dispose();
     _vehicleIdController.dispose();
     _locationController.dispose();
-    // The IncidentController is supplied and owned by the parent.
     super.dispose();
   }
 

@@ -84,7 +84,6 @@ class RouteScheduleContext {
   final String serviceValidFrom;
   final String serviceValidUntil;
 
-  /// Static GTFS service-day wall-clock values, which may exceed 24:00.
   final String publishedServiceStart;
   final String publishedServiceEnd;
 }
@@ -107,14 +106,11 @@ class RouteCatalogEntry {
     }
   }
 
-  /// The provider's internal GTFS identifier; it is not a Deployment ID.
   final String gtfsRouteId;
   final String agencyId;
 
-  /// Copied to `Deployment.routeId` after future staff selection.
   final String routeShortName;
 
-  /// Copied to `Deployment.routeName` after future staff selection.
   final String routeLongName;
   final int routeType;
   final RouteScheduleContext? scheduleContext;

@@ -29,7 +29,6 @@ class IncidentStatusRecordDto {
   }
 }
 
-/// Storage-neutral representation of a persisted Incident record.
 class IncidentRecordDto {
   IncidentRecordDto({
     required this.incidentCode,

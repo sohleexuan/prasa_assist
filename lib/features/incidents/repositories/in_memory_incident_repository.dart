@@ -13,10 +13,6 @@ import 'incident_repository_capabilities.dart';
 
 typedef IncidentClock = DateTime Function();
 
-/// In-memory Incident storage for development and demonstration only.
-///
-/// Records reset when the application restarts. This repository does not
-/// connect to Supabase or any live government-data source.
 class InMemoryIncidentRepository
     implements IncidentRepository, IncidentRepositoryCapabilitiesProvider {
   InMemoryIncidentRepository({

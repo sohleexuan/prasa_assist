@@ -8,10 +8,6 @@ import '../repositories/recommendation_repository.dart';
 import 'deterministic_recommendation_rule_engine.dart';
 import 'recommendation_generator.dart';
 
-/// Creates deterministic pending-review recommendations from verified facts.
-///
-/// This service never invokes a provider. AI analysis remains a separate,
-/// explanation-only operation after deterministic persistence.
 class IncidentRecommendationSubmissionService {
   IncidentRecommendationSubmissionService({
     required this.repository,
@@ -23,8 +19,6 @@ class IncidentRecommendationSubmissionService {
   final DeterministicRecommendationRuleEngine ruleEngine;
   final RecommendationGenerator generator;
 
-  /// Submits one verified incident snapshot using [recommendationId] as an
-  /// idempotency key. A successful retry with the same ID reuses that record.
   Future<RecommendationRecordDto?> submit({
     required VerifiedIncidentRecommendationInput input,
     required String ownerUserId,
